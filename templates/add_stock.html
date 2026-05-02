@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Stock</title>
+    <!-- Modern typography -->
+    <link href="https://googleapis.com" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #22c55e; /* Green for "Add" action */
+            --primary-hover: #16a34a;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 90vh; /* Centers the card vertically on mobile */
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .restock-card {
+            background: var(--card-bg);
+            padding: 30px 24px;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .icon-circle {
+            width: 60px;
+            height: 60px;
+            background: #f0fdf4;
+            color: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin: 0 auto 20px;
+            font-weight: bold;
+        }
+
+        h2 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .product-name {
+            color: var(--primary);
+            display: block;
+            margin-bottom: 25px;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        input {
+            width: 100%;
+            padding: 18px;
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            font-size: 20px; /* Large text for easy reading */
+            text-align: center;
+            outline: none;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+            background: #fcfcfc;
+            font-weight: 600;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1);
+        }
+
+        button {
+            width: 100%;
+            background-color: var(--primary);
+            color: white;
+            padding: 16px;
+            border: none;
+            border-radius: 16px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            margin-top: 10px;
+        }
+
+        button:active {
+            transform: scale(0.96);
+            background-color: var(--primary-hover);
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 25px;
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover {
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="restock-card">
+        <div class="icon-circle">+</div>
+        <h2>Add Stock</h2>
+        <span class="product-name">{{ product[1] }}</span>
+
+        <form method="POST">
+            <div class="input-wrapper">
+                <input type="number" 
+                       name="quantity" 
+                       placeholder="0" 
+                       inputmode="numeric" 
+                       pattern="[0-9]*"
+                       required 
+                       autofocus>
+            </div>
+            <button type="submit">Update Inventory</button>
+        </form>
+
+        <a href="/inventory" class="back-link">← Cancel and Go Back</a>
+    </div>
+</div>
+
+</body>
+</html>
+
+
+<!--
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Stock</title>
+</head>
+<body>
+
+<h2>Add Stock for {{ product[0] }}</h2>
+
+<form method="POST">
+    <input type="number" name="quantity" placeholder="Enter quantity" required>
+    <button type="submit">Add</button>
+</form>
+<a href="/inventory" class="text-decoration-none text-muted">← Back to Inventory page</a>
+</body>
+</html>
+-->

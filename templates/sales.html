@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sales</title>
+
+    <!-- 🔥 MOBILE SUPPORT -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        .product-card {
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: white;
+        }
+
+        /* Sticky cart bottom (mobile) */
+        .sticky-total {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 10px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-3">
+
+<a href="/portal" class="btn btn-secondary mb-3 w-100">← Back to portal</a>
+
+<!-- 🔵 CATEGORY FILTER -->
+<form method="GET" action="/sales">
+    <select name="category_id" onchange="this.form.submit()" class="form-select mb-3">
+
+        <option value="all"
+            {% if selected_category == "all" or not selected_category %}
+                selected
+            {% endif %}
+        >All Categories</option>
+
+        {% for c in categories %}
+        <option value="{{ c[0] }}"
+            {% if selected_category == c[0]|string %}
+                selected
+            {% endif %}
+        >
+            {{ c[1] }}
+        </option>
+        {% endfor %}
+
+    </select>
+</form>
+
+<div class="row">
+
+<!-- 🔴 PRODUCTS -->
+<div class="col-12 col-md-6">
+    <h5>Products</h5>
+
+    {% for p in products %}
+    <div class="product-card shadow-sm">
+
+        <strong>{{ p[1] }}</strong><br>
+        Stock: {{ p[7] }}
+
+        <!-- PRICE ADJUST -->
+        <input type="number" step="0.01"
+               id="extra_{{ p[0] }}"
+               class="form-control mt-2"
+               placeholder="+ Extra Price">
+
+        <button class="btn btn-primary w-100 mt-2 btn-lg"
+            onclick="addToCart({{ p[0] }}, '{{ p[1] }}', {{ p[6] }}, {{ p[7] }})">
+            Add to Cart
+        </button>
+
+    </div>
+    {% endfor %}
+
+</div>
+
+<!-- 🔵 CART -->
+<div class="col-12 col-md-6">
+
+    <h5>Cart</h5>
+
+    <!-- Customer -->
+    <select id="customer_id" class="form-select mb-2">
+        <option value="">Walk-in Customer</option>
+        {% for c in customers %}
+        <option value="{{ c[0] }}">{{ c[1] }}</option>
+        {% endfor %}
+    </select>
+
+    <!-- Credit -->
+    <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" id="is_credit">
+        <label class="form-check-label">Credit Sale</label>
+    </div>
+
+    <!-- CART TABLE -->
+    <div class="table-responsive">
+        <table class="table" id="cart-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- 🔥 STICKY TOTAL -->
+    <div class="sticky-total">
+        <h4>Total: <span id="grand-total">0</span></h4>
+        <button class="btn btn-success w-100 btn-lg" onclick="completeSale()">
+            Complete Sale
+        </button>
+    </div>
+
+</div>
+
+</div>
+<a href="/portal" class="btn btn-secondary mb-3 w-100">← Back to portal</a>
+</div>
+
+<script>
+
+let cart = {};
+
+function addToCart(id, name, base_price, stock) {
+
+    let extra = parseFloat(document.getElementById("extra_" + id).value) || 0;
+    let final_price = base_price + extra;
+
+    if (!cart[id]) {
+        cart[id] = {
+            name: name,
+            price: final_price,
+            qty: 1,
+            stock: stock
+        };
+    } else {
+        if (cart[id].qty >= stock) {
+            alert("Stock limit reached!");
+            return;
+        }
+        cart[id].qty++;
+    }
+
+    renderCart();
+}
+
+function renderCart() {
+    let tbody = document.querySelector("#cart-table tbody");
+    tbody.innerHTML = "";
+    let total = 0;
+
+    for (let id in cart) {
+        let item = cart[id];
+        let rowTotal = item.qty * item.price;
+        total += rowTotal;
+
+        tbody.innerHTML += `
+        <tr>
+            <td>${item.name}</td>
+            <td>
+                <button class="btn btn-sm btn-secondary" onclick="changeQty(${id}, -1)">-</button>
+                ${item.qty}
+                <button class="btn btn-sm btn-secondary" onclick="changeQty(${id}, 1)">+</button>
+            </td>
+            <td>${item.price}</td>
+            <td>${rowTotal}</td>
+            <td>
+                <button class="btn btn-sm btn-danger" onclick="removeItem(${id})">X</button>
+            </td>
+        </tr>`;
+    }
+
+    document.getElementById("grand-total").innerText = total;
+}
+
+function changeQty(id, change) {
+    let item = cart[id];
+
+    if (change > 0 && item.qty >= item.stock) {
+        alert("No more stock!");
+        return;
+    }
+
+    item.qty += change;
+
+    if (item.qty <= 0) delete cart[id];
+
+    renderCart();
+}
+
+function removeItem(id) {
+    delete cart[id];
+    renderCart();
+}
+
+function completeSale() {
+
+    let cartArray = [];
+    let total = 0;
+
+    for (let id in cart) {
+        let item = cart[id];
+        cartArray.push({
+            id: id,
+            name: item.name,
+            qty: item.qty,
+            price: item.price
+        });
+        total += item.qty * item.price;
+    }
+
+    let customer_id = document.getElementById("customer_id").value;
+    let is_credit = document.getElementById("is_credit").checked;
+
+    if (cartArray.length === 0) {
+        alert("Cart is empty!");
+        return;
+    }
+
+    fetch('/complete_sale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            cart: cartArray,
+            total: total,
+            customer_id: customer_id,
+            is_credit: is_credit
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        if (data.status === "error") {
+            alert(data.message);
+            return;
+        }
+
+        window.location.href = "/receipt/" + data.sale_id;
+
+    });
+}
+
+</script>
+
+</body>
+</html>

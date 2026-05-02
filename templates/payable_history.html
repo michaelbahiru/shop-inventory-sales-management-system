@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payable Ledger</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-4">
+
+<a href="/payables" class="btn btn-secondary mb-3">← Back</a>
+
+<h4>Supplier Ledger</h4>
+
+<!-- 🔵 PURCHASE INFO -->
+<div class="card mb-3">
+    <div class="card-body">
+        <strong>Supplier:</strong> {{ purchase[0] }} <br>
+        <strong>Product:</strong> {{ purchase[1] }} <br>
+        <strong>Quantity:</strong> {{ purchase[2] }} <br>
+        <strong>Unit Cost:</strong> {{ purchase[3] }} <br>
+        <strong>Total Amount:</strong> {{ purchase[4] }} <br>
+        <strong>Date:</strong> {{ purchase[5] }}
+    </div>
+</div>
+
+<!-- 🔴 LEDGER TABLE -->
+<table class="table table-bordered">
+    <thead class="table-dark">
+        <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Debit (You Owe)</th>
+            <th>Credit (Payment)</th>
+            <!--<th>Balance</th>-->
+        </tr>
+    </thead>
+    <tbody>
+
+        <!-- 🔵 INITIAL PURCHASE -->
+        {% set balance = purchase[4] %}
+        <tr>
+            <td>{{ purchase[5] }}</td>
+            <td>Purchase</td>
+            <td>{{ purchase[4] }}</td>
+            <td>-</td>
+            <!--<td><strong>{{ balance }}</strong></td>-->
+        </tr>
+
+        <!-- 🔴 PAYMENTS -->
+        {% for p in payments %}
+            {% set balance = balance - p[0] %}
+            <tr>
+                <td>{{ p[2] }}</td>
+                <td>{{ p[1] or 'Payment' }}</td>
+                <td>-</td>
+                <td>{{ p[0] }}</td>
+                <!--<td><strong>{{ balance }}</strong></td>-->
+            </tr>
+        {% endfor %}
+
+    </tbody>
+</table>
+
+</div>
+
+</body>
+</html>
+
+
+
+
+<!--<!DOCTYPE html>
+<html>
+<head>
+    <title>Payable History</title>
+</head>
+<body>
+
+<h3>Payment History</h3>
+
+<table border="1">
+    <tr>
+        <th>Amount</th>
+        <th>Reference</th>
+        <th>Date</th>
+    </tr>
+
+    {% for p in payments %}
+    <tr>
+        <td>{{ p[0] }}</td>
+        <td>{{ p[1] }}</td>
+        <td>{{ p[2] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<a href="/payables">Back</a>
+
+</body>
+</html>-->

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suppliers Management</title>
+    <!-- Importing a clean font -->
+    <link href="https://googleapis.com" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 450px; /* Perfect for mobile/tablet */
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        /* Form Styling */
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        input {
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px; /* Prevents iOS auto-zoom on focus */
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        /* List Styling */
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            background: var(--card-bg);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--border);
+        }
+
+        .supplier-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .supplier-name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .supplier-phone {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* Navigation */
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .back-link:hover {
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h3>Suppliers / እቃ አቅራቢዎች መመዝገቢያ</h3>
+    <a href="/portal" class="back-link">← Back to Portal</a>
+    <div class="card">
+        <form method="POST" action="/add_supplier">
+            <input type="text" name="name" placeholder="Supplier Name" required>
+            <input type="tel" name="phone" placeholder="Phone Number">
+            <button type="submit">Add Supplier</button>
+        </form>
+    </div>
+
+    <ul>
+        {% for s in suppliers %}
+        <li>
+            <div class="supplier-info">
+                <span class="supplier-name">{{ s[1] }}</span>
+                <span class="supplier-phone">{{ s[2] }}</span>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <a href="/portal" class="back-link">← Back to Portal</a>
+</div>
+
+</body>
+</html>
+
+
+<!--
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Suppliers</title>
+</head>
+<body>
+
+<h3>Suppliers</h3>
+
+<form method="POST" action="/add_supplier">
+    <input type="text" name="name" placeholder="Supplier Name" required>
+    <input type="text" name="phone" placeholder="Phone">
+    <button>Add Supplier</button>
+</form>
+
+<hr>
+
+<ul>
+{% for s in suppliers %}
+    <li>{{ s[1] }} - {{ s[2] }}</li>
+{% endfor %}
+</ul>
+
+<a href="/portal">Back</a>
+</body>
+</html>
+-->

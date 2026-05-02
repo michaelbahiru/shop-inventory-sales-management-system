@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Management</title>
+    <!-- Modern sans-serif font -->
+    <link href="https://googleapis.com" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0d9488; /* Teal theme for Customers */
+            --primary-hover: #0f766e;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 450px;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            color: var(--text);
+        }
+
+        /* Form Card */
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        input {
+            padding: 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 16px; /* Critical for mobile: prevents auto-zoom */
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 4px;
+        }
+
+        button:active {
+            transform: scale(0.97);
+        }
+
+        /* Customer List */
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            background: var(--card-bg);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            border: 1px solid var(--border);
+            transition: transform 0.2s;
+        }
+
+        /* Simple avatar icon for UX */
+        .avatar {
+            width: 40px;
+            height: 40px;
+            background: #f1f5f9;
+            border-radius: 50%;
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .customer-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .customer-name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .customer-phone {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Bottom Navigation */
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 30px;
+            text-decoration: none;
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 14px;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <h2>Customers / ደንበኞች መመዝገቢያ</h2>
+    <a href="/portal" class="back-link">← Return to Portal</a>
+    <div class="card">
+        <form method="POST" action="/add_customer">
+            <input type="text" name="name" placeholder="Full Name" required>
+            <input type="tel" name="phone" placeholder="Phone Number">
+            <button type="submit">Add Customer</button>
+        </form>
+    </div>
+
+    <ul>
+        {% for c in customers %}
+        <li>
+            <div class="avatar">{{ c[1][0]|upper }}</div>
+            <div class="customer-info">
+                <span class="customer-name">{{ c[1] }}</span>
+                <span class="customer-phone">{{ c[2] }}</span>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <a href="/portal" class="back-link">← Return to Portal</a>
+</div>
+
+</body>
+</html>
+
+
+
+<!--
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Customers</title>
+</head>
+<body>
+
+<h2>Customers</h2>
+
+<form method="POST" action="/add_customer">
+    <input type="text" name="name" placeholder="Customer Name" required>
+    <input type="text" name="phone" placeholder="Phone">
+    <button>Add</button>
+</form>
+
+<hr>
+
+<ul>
+{% for c in customers %}
+    <li>{{ c[1] }} - {{ c[2] }}</li>
+{% endfor %}
+</ul>
+
+<a href="/portal">Back</a>
+
+</body>
+</html>
+-->
