@@ -1,6 +1,225 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Business Reports</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-3 mb-5">
+
+    <!-- BACK -->
+    <a href="/portal" class="btn btn-secondary mb-3 w-100">
+        ← Back to Portal
+    </a>
+
+    <!-- TITLE -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+
+            <h3 class="mb-3">
+                Business Reports Dashboard
+            </h3>
+
+            <!-- FILTER -->
+            <form method="GET" class="row g-2">
+
+                <div class="col-12 col-md-5">
+                    <input type="date"
+                           name="start_date"
+                           value="{{ start_date }}"
+                           class="form-control">
+                </div>
+
+                <div class="col-12 col-md-5">
+                    <input type="date"
+                           name="end_date"
+                           value="{{ end_date }}"
+                           class="form-control">
+                </div>
+
+                <div class="col-12 col-md-2">
+                    <button class="btn btn-primary w-100">
+                        Filter
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+    <!-- SUMMARY -->
+    <div class="row">
+
+        <div class="col-6 col-md-3 mb-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body text-center">
+                    <h6>Today</h6>
+                    <h5>{{ today_sales }}</h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3 mb-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body text-center">
+                    <h6>Week</h6>
+                    <h5>{{ weekly_sales }}</h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3 mb-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body text-center">
+                    <h6>Month</h6>
+                    <h5>{{ monthly_sales }}</h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3 mb-3">
+            <div class="card shadow-sm border-0 bg-success text-white">
+                <div class="card-body text-center">
+                    <h6>Profit</h6>
+                    <h5>{{ total_profit }}</h5>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- REVENUE -->
+    <div class="row">
+
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+
+                    <h5>Total Revenue</h5>
+
+                    <h3 class="text-primary">
+                        {{ total_revenue }}
+                    </h3>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+
+                    <h5>Total Items Sold</h5>
+
+                    <h3 class="text-dark">
+                        {{ total_items_sold }}
+                    </h3>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- CHART -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+
+            <h5 class="mb-3">
+                Sales Trend
+            </h5>
+
+            <canvas id="salesChart"></canvas>
+
+        </div>
+    </div>
+
+    <!-- TOP PRODUCTS -->
+    <div class="card shadow-sm border-0">
+
+        <div class="card-body">
+
+            <h5 class="mb-3">
+                Top Selling Products
+            </h5>
+
+            <table class="table table-bordered">
+
+                <thead class="table-dark">
+                    <tr>
+                        <th>Product</th>
+                        <th>Quantity Sold</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for p in top_products %}
+                    <tr>
+                        <td>{{ p[0] }}</td>
+                        <td>{{ p[1] }}</td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+const ctx = document.getElementById('salesChart');
+
+new Chart(ctx, {
+
+    type: 'line',
+
+    data: {
+
+        labels: {{ dates | tojson }},
+
+        datasets: [{
+
+            label: 'Sales',
+
+            data: {{ amounts | tojson }},
+
+            borderWidth: 3,
+
+            tension: 0.3,
+
+            fill: false
+
+        }]
+    }
+
+});
+
+</script>
+
+</body>
+</html>
+
+
+
+<!--
+<!DOCTYPE html>
+<html>
+<head>
 <title>Reports</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -104,3 +323,4 @@ fill: false
 
 </body>
 </html>
+-->

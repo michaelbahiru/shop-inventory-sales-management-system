@@ -1,4 +1,394 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payables</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+
+        /* MOBILE CARDS */
+        .payable-card{
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+        }
+
+        .desktop-table{
+            display: block;
+        }
+
+        .mobile-view{
+            display: none;
+        }
+
+        @media(max-width:768px){
+
+            .desktop-table{
+                display: none;
+            }
+
+            .mobile-view{
+                display: block;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body class="bg-light">
+
+<!-- ALERTS -->
+{% if request.args.get('error') == 'overpay' %}
+<div class="alert alert-danger m-3">
+    Cannot pay more than due amount.
+</div>
+
+{% elif request.args.get('error') == 'invalid' %}
+<div class="alert alert-danger m-3">
+    Invalid input.
+</div>
+
+{% elif request.args.get('error') == 'invalid_amount' %}
+<div class="alert alert-danger m-3">
+    Amount must be greater than 0.
+</div>
+
+{% elif request.args.get('error') == 'paid' %}
+<div class="alert alert-warning m-3">
+    This payable is already cleared.
+</div>
+
+{% elif request.args.get('success') %}
+<div class="alert alert-success m-3">
+    Payment recorded successfully.
+</div>
+{% endif %}
+
+<div class="container mt-4">
+
+    <!-- BACK -->
+    <a href="/portal" class="btn btn-secondary mb-3 w-100">
+        ← Back
+    </a>
+
+    <!-- Supplieres Dashboard -->
+    <a href="/supplier_dashboard" class="btn btn-secondary mb-3 w-100">
+        Supplieres Dashboard
+    </a>
+
+    <!-- TOTAL PAYABLE -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-body">
+
+            <h5 class="mb-0">
+                Total Payables:
+                <span class="text-danger">
+                    {{ payables | sum(attribute=5) }}
+                </span>
+            </h5>
+
+        </div>
+    </div>
+
+    <!-- TITLE -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-body">
+
+            <h3 class="mb-0">
+                Supplier Payables / የሚከፈሉ እዳዎች
+            </h3>
+
+        </div>
+    </div>
+
+    <!-- DESKTOP TABLE -->
+    <div class="desktop-table">
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-striped table-hover align-middle">
+
+                <thead class="table-dark">
+
+                    <tr>
+                        <th>Supplier</th>
+                        <th>Product</th>
+                        <th>Qty</th>
+                        <th>Unit Cost</th>
+                        <th>Amount Due</th>
+                        <th>Description</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th width="220">Pay</th>
+                        <th>History</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for p in payables %}
+                    <tr>
+
+                        <!-- SUPPLIER -->
+                        <td>
+                            {{ p[1] }}
+                        </td>
+
+                        <!-- PRODUCT -->
+                        <td>
+                            {{ p[2] }}
+                        </td>
+
+                        <!-- QTY -->
+                        <td>
+                            {{ p[3] }}
+                        </td>
+
+                        <!-- UNIT COST -->
+                        <td>
+                            {{ p[4] }}
+                        </td>
+
+                        <!-- AMOUNT DUE -->
+                        <td>
+
+                            <strong class="text-danger">
+                                {{ p[5] }}
+                            </strong>
+
+                        </td>
+
+                        <!-- DESCRIPTION -->
+                        <td>
+
+                            {% if p[7] %}
+                                {{ p[7] }}
+                            {% else %}
+                                -
+                            {% endif %}
+
+                        </td>
+
+                        <!-- DATE -->
+                        <td>
+                            {{ p[6] }}
+                        </td>
+
+                        <!-- STATUS -->
+                        <td>
+
+                            {% if p[5] <= 0 %}
+                                <span class="badge bg-success">
+                                    Paid
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger">
+                                    Pending
+                                </span>
+                            {% endif %}
+
+                        </td>
+
+                        <!-- PAY FORM -->
+                        <td>
+
+                            {% if p[5] > 0 %}
+
+                            <form method="POST" action="/pay_payable/{{ p[0] }}">
+
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    max="{{ p[5] }}"
+                                    name="amount"
+                                    class="form-control mb-1"
+                                    placeholder="Amount"
+                                    required
+                                >
+
+                                <input
+                                    type="text"
+                                    name="payment_link"
+                                    class="form-control mb-1"
+                                    placeholder="Reference"
+                                >
+
+                                <button class="btn btn-success btn-sm w-100">
+                                    Pay
+                                </button>
+
+                            </form>
+
+                            {% else %}
+
+                            <button class="btn btn-secondary btn-sm w-100" disabled>
+                                Cleared
+                            </button>
+
+                            {% endif %}
+
+                        </td>
+
+                        <!-- HISTORY -->
+                        <td>
+
+                            <a href="/payable_history/{{ p[0] }}"
+                               class="btn btn-info btn-sm w-100">
+
+                               History
+
+                            </a>
+
+                        </td>
+
+                    </tr>
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    <!-- MOBILE VIEW -->
+    <div class="mobile-view">
+
+        {% for p in payables %}
+
+        <div class="payable-card shadow-sm">
+
+            <h5 class="mb-3">
+                {{ p[2] }}
+            </h5>
+
+            <p>
+                <strong>Supplier:</strong>
+                {{ p[1] }}
+            </p>
+
+            <p>
+                <strong>Quantity:</strong>
+                {{ p[3] }}
+            </p>
+
+            <p>
+                <strong>Unit Cost:</strong>
+                {{ p[4] }}
+            </p>
+
+            <p>
+                <strong>Amount Due:</strong>
+
+                <span class="text-danger fw-bold">
+                    {{ p[5] }}
+                </span>
+            </p>
+
+            <p>
+                <strong>Description:</strong>
+
+                {% if p[7] %}
+                    {{ p[7] }}
+                {% else %}
+                    -
+                {% endif %}
+            </p>
+
+            <p>
+                <strong>Date:</strong>
+                {{ p[6] }}
+            </p>
+
+            <p>
+
+                <strong>Status:</strong>
+
+                {% if p[5] <= 0 %}
+                    <span class="badge bg-success">
+                        Paid
+                    </span>
+                {% else %}
+                    <span class="badge bg-danger">
+                        Pending
+                    </span>
+                {% endif %}
+
+            </p>
+
+            {% if p[5] > 0 %}
+
+            <form method="POST" action="/pay_payable/{{ p[0] }}">
+
+                <input
+                    type="number"
+                    step="0.01"
+                    max="{{ p[5] }}"
+                    name="amount"
+                    class="form-control mb-2"
+                    placeholder="Amount"
+                    required
+                >
+
+                <input
+                    type="text"
+                    name="payment_link"
+                    class="form-control mb-2"
+                    placeholder="Reference"
+                >
+
+                <button class="btn btn-success w-100 mb-2">
+                    Pay
+                </button>
+
+            </form>
+
+            {% else %}
+
+            <button class="btn btn-secondary w-100 mb-2" disabled>
+                Cleared
+            </button>
+
+            {% endif %}
+
+            <a href="/payable_history/{{ p[0] }}"
+               class="btn btn-info w-100">
+
+               View History
+
+            </a>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+    <!-- SUPPLIER DASHBOARD -->
+    <a href="/supplier_dashboard"
+       class="btn btn-dark w-100 mt-3">
+
+       Go to Supplier Dashboard
+
+    </a>
+
+</div>
+
+</body>
+</html>
+
+
+<!--
 <!DOCTYPE html>
 <html>
 <head>
@@ -72,7 +462,7 @@
     {% endfor %}
     </tbody>
 </table>
-
+<a href="/supplier_dashboard" class="btn btn-secondary mb-3">Go to supplier dashboard</a>
 </div>
 
 </body>

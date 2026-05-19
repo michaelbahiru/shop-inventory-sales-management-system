@@ -1,0 +1,22 @@
+# Environment files
+.env
+
+# Virtual environments
+venv/
+.shop_system/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Flask instance folder
+instance/
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Temporary Office files
+~$*

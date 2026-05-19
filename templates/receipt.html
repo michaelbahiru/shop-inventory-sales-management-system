@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Receipt #{{ sale[0] }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <style>
         /* Base styles for the "paper" */
         body {
@@ -108,6 +109,14 @@
         <p><strong>Sale ID:</strong> {{ sale[0] }}</p>
         <p><strong>Customer:</strong> {{ sale[3] or "Walk-in" }}</p>
         <p><strong>Payment:</strong> {{ "Credit" if sale[2] else "Cash" }}</p>
+        <p><strong>Date and Time:</strong><div class="details">
+            <!-- ሰዓቱ እዚህ ጋር ይቀመጣል -->
+                      <div class="date-time"><span id="transaction-time"></span></div>
+                      </div></p>
+
+
+
+
     </div>
 
     <table>
@@ -138,6 +147,39 @@
         <a href="/sales" class="nav-link">← Return to New Sale</a>
     </div>
 </div>
+
+
+
+ <script>
+   // ገጹ እንደተከፈተ ያለውን ሰዓት አንዴ ብቻ ይይዛል
+        function recordTransactionTime() {
+            const now = new Date();
+            
+            const options = { 
+                timeZone: 'Africa/Addis_Ababa',
+                month: 'long', 
+                day: 'numeric', 
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true 
+            };
+
+            let formattedDate = now.toLocaleString('en-US', options);
+            
+            // ፎርማቱን ማስተካከል (ለምሳሌ፦ May 16 2026 - 8:00 PM)
+            formattedDate = formattedDate.replace(',', '').replace(',', ' -');
+
+            // በገጹ ላይ ያለውን ቦታ በሰዓቱ መተካት
+            document.getElementById('transaction-time').innerText = formattedDate;
+        }
+
+        // ገጹ ሲጫን ተግባራዊ እንዲሆን
+        window.onload = recordTransactionTime;
+      
+
+</script>
+
 
 </body>
 </html>

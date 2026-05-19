@@ -3,10 +3,15 @@ from db import get_db_connection
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import json
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"  # change this later
+app.secret_key = os.getenv("my_super_secret_key")
+
+
 
 @app.route('/')
 def home():
@@ -15,143 +20,221 @@ def home():
     return redirect('/login')
 
 
-'''REGISTER ROUTE'''
+
+
+'''REGISTER STAFF ROUTE'''
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+
+    # 🔒 ONLY ADMIN CAN ACCESS
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    if session.get('role') != 'admin':
+        return redirect('/unauthorized')
+
     if request.method == 'POST':
+
         username = request.form['username']
         password = request.form['password']
-        role = request.form['role']   # ✅ NEW
+        role = request.form['role']
 
+        # 🔐 HASH PASSWORD
         hashed_password = generate_password_hash(password)
 
         conn = get_db_connection()
         cursor = conn.cursor()
 
         try:
+
+            # 🔴 CHECK IF USERNAME EXISTS
+            cursor.execute(
+                "SELECT id FROM users WHERE username=%s",
+                (username,)
+            )
+
+            existing_user = cursor.fetchone()
+
+            if existing_user:
+                conn.close()
+                return "Username already exists"
+
+            # 🔵 INSERT USER !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             cursor.execute("""
                 INSERT INTO users (username, password_hash, role)
                 VALUES (%s, %s, %s)
-            """, (username, hashed_password, role))
-            
+            """, (
+                username,
+                hashed_password,
+                role
+            ))
+
             conn.commit()
-
-        except:
             conn.close()
-            return "Username already exists!"
 
-        conn.close()
-        return redirect('/login')
+            return redirect('/portal')
+
+        except Exception as e:
+
+            conn.rollback()
+            conn.close()
+
+            return f"ERROR: {str(e)}"
 
     return render_template('register.html')
+
+
+
+
 
 '''LOGIN ROUTE'''
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+
     if request.method == 'POST':
+
         username = request.form['username']
         password = request.form['password']
 
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+        cursor.execute(
+            "SELECT * FROM users WHERE username=%s",
+            (username,)
+        )
+
         user = cursor.fetchone()
 
         conn.close()
 
         if user and check_password_hash(user[2], password):
-            session['user_id'] = user[0]
-            session['role'] = user[3]   # ✅ NEW (store role)
 
-            return redirect('/portal')
+            # ✅ STORE SESSION
+            session['user_id'] = user[0]
+            session['role'] = user[3]
+
+            # 🔥 ROLE-BASED REDIRECT
+            if user[3] == 'admin':
+                return redirect('/portal')
+
+            elif user[3] == 'Sales':
+                return redirect('/sales')
+
+            elif user[3] == 'purchaser':
+                return redirect('/inventory')
+
+            else:
+                return "Invalid role assigned"
 
         return "Invalid username or password"
 
     return render_template('login.html')
 
 
-'''STEP 4 — LOGOUT'''
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect('/login')
+
 
 '''STEP 5 — PORTAL PAGE'''
 @app.route('/portal')
 def portal():
     if 'user_id' not in session:
         return redirect('/login')
+    # -------------------------------------------
+    if session.get('role') != 'admin':
+        return redirect('/unauthorized')
+    #--------------------------------------------
     return render_template('portal.html')
 
 
-'''INVENTORY ROUTE (Backend) - FIXED CATEGORY FILTER'''
+'''LOGOUT ROUTE'''
+@app.route('/logout')
+def logout():
+
+    # 🔴 CLEAR SESSION
+    session.clear()
+
+    # 🔵 RETURN TO LOGIN
+    return redirect('/login')
+
+
+
+'''UNAUTHORIZED ROUTE'''
+@app.route('/unauthorized')
+def unauthorized():
+    return render_template('unauthorized.html')
+
+'''INVENTORY ROUTE V2'''
 @app.route('/inventory')
 def inventory():
+
     if 'user_id' not in session:
         return redirect('/login')
+    #================================================================
+    if session.get('role') not in ['admin', 'purchaser']:
+        return redirect('/unauthorized')
+    #================================================================
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 1. Categories
+    # 🔵 Categories
     cursor.execute("SELECT * FROM categories")
     categories = cursor.fetchall()
 
-    # 2. Suppliers
-    cursor.execute("SELECT * FROM suppliers")
-    suppliers = cursor.fetchall()
+    # 🔵 Category Filter
+    selected_category = request.args.get('category', 'all')
 
-    # 3. Get filter
-    category_filter = request.args.get('category')
+    # 🔥 MAIN INVENTORY QUERY
+    query = """
+        SELECT
+            p.id,
+            p.name,
+            c.name,
+            p.quantity,
 
-    # 4. Build query (FIXED LOGIC)
-    base_query = """
-        SELECT 
-            products.id, products.name, categories.name,
-            products.selling_price, products.quantity,
-            products.buying_price, products.extra_cost
-        FROM products
-        LEFT JOIN categories ON products.category_id = categories.id
+            (
+                SELECT pi.selling_price
+                FROM purchase_items pi
+                WHERE pi.product_id = p.id
+                ORDER BY pi.id DESC
+                LIMIT 1
+            ) AS latest_price
+
+        FROM products p
+        LEFT JOIN categories c
+        ON p.category_id = c.id
     """
 
-    params = []
+    params = ()
 
-    if category_filter and category_filter != "all":
-        base_query += " WHERE products.category_id = %s"
-        params.append(category_filter)
+    # 🔵 FILTERING
+    if selected_category != "all":
+        query += " WHERE p.category_id = %s"
+        params = (selected_category,)
 
-    cursor.execute(base_query, params)
+    query += " ORDER BY p.id DESC"
+
+    cursor.execute(query, params)
+
     inventory = cursor.fetchall()
 
-    # 5. Calculations
-    total_stock_value = 0
-    total_expected_profit = 0
+    # 🔵 SUMMARY
     total_quantity = 0
 
     for item in inventory:
-        selling_price = float(item[3])
-        quantity = int(item[4])
-        buying_price = float(item[5] or 0)
-        extra_cost = float(item[6] or 0)
-
-        total_cost_per_unit = buying_price + extra_cost
-        total_stock_value += total_cost_per_unit * quantity
-        total_expected_profit += (selling_price - total_cost_per_unit) * quantity
-        total_quantity += quantity
+        total_quantity += item[3]
 
     conn.close()
 
     return render_template(
         'inventory.html',
-        categories=categories,
-        suppliers=suppliers,
         inventory=inventory,
-        total_stock_value=total_stock_value,
-        total_expected_profit=total_expected_profit,
-        total_quantity=total_quantity,
-        selected_category=category_filter  # 🔥 IMPORTANT
+        categories=categories,
+        selected_category=selected_category,
+        total_quantity=total_quantity
     )
+
+
 
 
 '''ADD CATEGORY'''
@@ -159,6 +242,11 @@ def inventory():
 def add_category():
     if 'user_id' not in session:
         return redirect('/login')
+    #================================================================
+    if session.get('role') not in ['admin', 'purchaser']:
+        return redirect('/unauthorized')
+    #================================================================
+    
 
     name = request.form['cat_name']
 
@@ -172,109 +260,88 @@ def add_category():
     return redirect('/inventory')
 
 
-'''ADD PRODUCT (CLEAN - NO BUYING LOGIC)'''
+
+'''ADD PRODUCT V2'''
 @app.route('/add_product', methods=['POST'])
 def add_product():
+
     if 'user_id' not in session:
         return redirect('/login')
+    #================================================================
+    if session.get('role') not in ['admin', 'purchaser']:
+        return redirect('/unauthorized')
+    #================================================================
 
     category_id = request.form['category_id']
-    supplier_id = request.form['supplier_id']
     name = request.form['name']
-
-    buying_price = float(request.form['buying_price'])
-    extra_cost = float(request.form['extra_cost'])
-    selling_price = float(request.form['selling_price'])
-
-    # 🔥 IMPORTANT: NO quantity here
-    quantity = 0
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
         INSERT INTO products
-        (name, category_id, supplier_id, buying_price, extra_cost, selling_price, quantity)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-    """, (name, category_id, supplier_id, buying_price, extra_cost, selling_price, quantity))
+        (category_id, name, quantity)
+        VALUES (%s, %s, 0)
+    """, (category_id, name))
 
     conn.commit()
     conn.close()
 
     return redirect('/inventory')
 
-
-'''ADD PRODUCT Older version
-@app.route('/add_product', methods=['POST'])
-def add_product():
-    if 'user_id' not in session:
-        return redirect('/login')
-
-    category_id = request.form['category_id']
-    supplier_id = request.form['supplier_id']
-    is_credit = request.form.get('is_credit') == 'on'
-
-    name = request.form['name']
-    buying_price = float(request.form['buying_price'])   # ✅ FIX
-    extra_cost = float(request.form['extra_cost'])       # ✅ FIX
-    selling_price = float(request.form['selling_price']) # ✅ FIX
-    quantity = int(request.form['quantity'])             # ✅ FIX
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # 🟢 Insert product
-    cursor.execute("""
-        INSERT INTO products 
-        (name, category_id, supplier_id, buying_price, extra_cost, selling_price, quantity)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-    """, (name, category_id, supplier_id, buying_price, extra_cost, selling_price, quantity))
-
-    # 🔥 FIXED INDENTATION + LOGIC
-    if is_credit:
-        total_cost = buying_price * quantity
-
-        cursor.execute("""
-            INSERT INTO payables (supplier_id, amount_due)
-            VALUES (%s, %s)
-        """, (supplier_id, total_cost))
-
-    conn.commit()
-    conn.close()
-
-    return redirect('/inventory')
-'''
-
-'''EDIT PRODUCT'''
+'''Edit Product Route'''
 @app.route('/edit_product/<int:id>', methods=['GET', 'POST'])
 def edit_product(id):
+
     if 'user_id' not in session:
         return redirect('/login')
+    #================================================================
+    if session.get('role') not in ['admin', 'purchaser']:
+        return redirect('/unauthorized')
+    #================================================================
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # 🔵 GET CATEGORIES
+    cursor.execute("SELECT * FROM categories")
+    categories = cursor.fetchall()
+
     if request.method == 'POST':
+
         name = request.form['name']
-        price = request.form['selling_price']
-        quantity = request.form['quantity']
+        category_id = request.form['category_id']
 
         cursor.execute("""
             UPDATE products
-            SET name=%s, selling_price=%s, quantity=%s
+            SET name=%s,
+                category_id=%s
             WHERE id=%s
-        """, (name, price, quantity, id))
+        """, (name, category_id, id))
 
         conn.commit()
         conn.close()
+
         return redirect('/inventory')
 
-    cursor.execute("SELECT * FROM products WHERE id=%s", (id,))
+    # 🔵 GET PRODUCT
+    cursor.execute("""
+        SELECT *
+        FROM products
+        WHERE id=%s
+    """, (id,))
+
     product = cursor.fetchone()
 
     conn.close()
 
-    return render_template('edit_product.html', product=product)
+    return render_template(
+        'edit_product.html',
+        product=product,
+        categories=categories
+    )
+
+
 
 '''DELETE PRODUCT'''
 @app.route('/delete_product/<int:id>')
@@ -292,36 +359,8 @@ def delete_product(id):
     return redirect('/inventory')
 
 
-'''Add Stock Older version
-@app.route('/add_stock/<int:id>', methods=['GET', 'POST'])
-def add_stock(id):
-    if 'user_id' not in session:
-        return redirect('/login')
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
 
-    if request.method == 'POST':
-        quantity = int(request.form['quantity'])
-
-        cursor.execute("""
-            UPDATE products
-            SET quantity = quantity + %s
-            WHERE id = %s
-        """, (quantity, id))
-
-        conn.commit()
-        conn.close()
-
-        return redirect('/inventory')
-
-    cursor.execute("SELECT name FROM products WHERE id=%s", (id,))
-    product = cursor.fetchone()
-
-    conn.close()
-
-    return render_template('add_stock.html', product=product)
-'''
 
 '''ADD STOCK → REDIRECT TO PURCHASE (Newer version)'''
 @app.route('/add_stock/<int:id>')
@@ -333,49 +372,122 @@ def add_stock(id):
     
 
 
-'''SALES ROUTE - FIXED'''
+
+
+'''SALES ROUTE V2'''
 @app.route('/sales')
 def sales():
+
     if 'user_id' not in session:
         return redirect('/login')
+    #-------------------------------------------------------------
+    if session.get('role') not in ['admin', 'Sales']:
+        return redirect('/unauthorized')
+    #------------------------------------------------------------
 
     category_id = request.args.get('category_id')
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 🔵 Get categories
-    cursor.execute("SELECT * FROM categories")
+    # 🔵 GET CATEGORIES
+    cursor.execute("""
+        SELECT *
+        FROM categories
+        ORDER BY name ASC
+    """)
     categories = cursor.fetchall()
 
-    # 🔥 FIXED QUERY (WITH STOCK FILTER + CLEAN LOGIC)
-    base_query = "SELECT * FROM products WHERE quantity > 0"
-    params = []
-
+    # 🔵 PRODUCTS + LATEST SELLING PRICE
     if category_id and category_id != "all":
-        base_query += " AND category_id = %s"
-        params.append(category_id)
 
-    cursor.execute(base_query, params)
+        cursor.execute("""
+            SELECT
+                p.id,
+                p.name,
+                c.name AS category_name,
+
+                p.quantity,
+
+                (
+                    SELECT pi.selling_price
+                    FROM purchase_items pi
+                    WHERE pi.product_id = p.id
+                    ORDER BY pi.id DESC
+                    LIMIT 1
+                ) AS latest_price
+
+            FROM products p
+
+            LEFT JOIN categories c
+            ON p.category_id = c.id
+
+            WHERE p.category_id = %s
+            AND p.quantity > 0
+
+            ORDER BY p.name ASC
+        """, (category_id,))
+
+    else:
+
+        cursor.execute("""
+            SELECT
+                p.id,
+                p.name,
+                c.name AS category_name,
+
+                p.quantity,
+
+                (
+                    SELECT pi.selling_price
+                    FROM purchase_items pi
+                    WHERE pi.product_id = p.id
+                    ORDER BY pi.id DESC
+                    LIMIT 1
+                ) AS latest_price
+
+            FROM products p
+
+            LEFT JOIN categories c
+            ON p.category_id = c.id
+
+            WHERE p.quantity > 0
+
+            ORDER BY p.name ASC
+        """)
+
     products = cursor.fetchall()
 
-    # 🔵 Customers
-    cursor.execute("SELECT * FROM customers")
+    # 🔵 CUSTOMERS
+    cursor.execute("""
+        SELECT *
+        FROM customers
+        ORDER BY name ASC
+    """)
     customers = cursor.fetchall()
 
     conn.close()
 
-    return render_template('sales.html',
-                           categories=categories,
-                           products=products,
-                           customers=customers,
-                           selected_category=category_id)  # 🔥 important
+    return render_template(
+        'sales.html',
+        categories=categories,
+        products=products,
+        customers=customers,
+        selected_category=category_id
+    )
+
+
+
 
 '''RECEIPT ROUTE'''
 @app.route('/receipt/<int:sale_id>')
 def receipt(sale_id):
     if 'user_id' not in session:
         return redirect('/login')
+    #-------------------------------------------------------------
+    if session.get('role') not in ['admin', 'sales']:
+        return redirect('/unauthorized')
+    #------------------------------------------------------------
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -403,17 +515,21 @@ def receipt(sale_id):
     return render_template('receipt.html', sale=sale, items=items)
 
 
+
+
+
 '''COMPLETE SALE: BACKEND ROUTE'''
 @app.route('/complete_sale', methods=['POST'])
 def complete_sale():
+
     if 'user_id' not in session:
         return {"status": "error", "message": "Unauthorized"}
 
     data = request.get_json()
+
     cart = data['cart']
     total_amount = data['total']
 
-    # Customer & credit
     customer_id = data.get('customer_id') or None
     is_credit = data.get('is_credit', False)
 
@@ -421,13 +537,30 @@ def complete_sale():
     cursor = conn.cursor()
 
     try:
+
+        # =========================================
         # STEP 1: CHECK STOCK
+        # =========================================
         for item in cart:
+
             product_id = item['id']
             qty_requested = item['qty']
 
-            cursor.execute("SELECT quantity FROM products WHERE id=%s", (product_id,))
-            stock = cursor.fetchone()[0]
+            cursor.execute("""
+                SELECT quantity
+                FROM products
+                WHERE id = %s
+            """, (product_id,))
+
+            result = cursor.fetchone()
+
+            if not result:
+                return {
+                    "status": "error",
+                    "message": f"Product ID {product_id} not found."
+                }
+
+            stock = result[0]
 
             if qty_requested > stock:
                 return {
@@ -435,16 +568,26 @@ def complete_sale():
                     "message": f"Not enough stock for product ID {product_id}"
                 }
 
-        # STEP 2: INSERT SALE
+        # =========================================
+        # STEP 2: CREATE SALE
+        # =========================================
         cursor.execute("""
-            INSERT INTO sales (customer_id, total_amount, is_credit)
+            INSERT INTO sales
+            (customer_id, total_amount, is_credit)
             VALUES (%s, %s, %s)
-        """, (customer_id, total_amount, is_credit))
+        """, (
+            customer_id,
+            total_amount,
+            is_credit
+        ))
 
         sale_id = cursor.lastrowid
 
-        # STEP 3: RECEIVABLE (if credit)
+        # =========================================
+        # STEP 3: CREATE RECEIVABLE
+        # =========================================
         if is_credit:
+
             if not customer_id:
                 return {
                     "status": "error",
@@ -452,35 +595,89 @@ def complete_sale():
                 }
 
             cursor.execute("""
-                INSERT INTO receivables (customer_id, sale_id, amount_due)
+                INSERT INTO receivables
+                (customer_id, sale_id, amount_due)
                 VALUES (%s, %s, %s)
-            """, (customer_id, sale_id, total_amount))
+            """, (
+                customer_id,
+                sale_id,
+                total_amount
+            ))
 
-        # STEP 4: INSERT ITEMS + UPDATE STOCK
+        # =========================================
+        # STEP 4: INSERT SALE ITEMS
+        # =========================================
         for item in cart:
+
             product_id = item['id']
-            qty = item['qty']
-            price = item['price']
+            qty = int(item['qty'])
+            selling_price = float(item['price'])
 
+            # 🔥 GET LATEST PURCHASE COST
             cursor.execute("""
-                INSERT INTO sale_items (sale_id, product_id, quantity, unit_price)
-                VALUES (%s, %s, %s, %s)
-            """, (sale_id, product_id, qty, price))
+                SELECT buying_price, extra_cost
+                FROM purchase_items
+                WHERE product_id = %s
+                ORDER BY id DESC
+                LIMIT 1
+            """, (product_id,))
 
+            latest_purchase = cursor.fetchone()
+
+            if latest_purchase:
+                buying_price = float(latest_purchase[0])
+                extra_cost = float(latest_purchase[1])
+
+                cost_price = buying_price + extra_cost
+
+            else:
+                # fallback protection
+                cost_price = 0
+
+            # 🔵 INSERT SALE ITEM
+            cursor.execute("""
+                INSERT INTO sale_items
+                (
+                    sale_id,
+                    product_id,
+                    quantity,
+                    unit_price,
+                    cost_price
+                )
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
+                sale_id,
+                product_id,
+                qty,
+                selling_price,
+                cost_price
+            ))
+
+            # 🔴 REDUCE STOCK
             cursor.execute("""
                 UPDATE products
                 SET quantity = quantity - %s
                 WHERE id = %s
-            """, (qty, product_id))
+            """, (
+                qty,
+                product_id
+            ))
 
         conn.commit()
 
-        # ✅ IMPORTANT CHANGE
-        return {"status": "success", "sale_id": sale_id}
+        return {
+            "status": "success",
+            "sale_id": sale_id
+        }
 
     except Exception as e:
+
         conn.rollback()
-        return {"status": "error", "message": str(e)}
+
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
     finally:
         conn.close()
@@ -490,6 +687,10 @@ def complete_sale():
 def customers():
     if 'user_id' not in session:
         return redirect('/login')
+    #-------------------------------------------------------------
+    if session.get('role') not in ['admin', 'Sales']:
+        return redirect('/unauthorized')
+    #------------------------------------------------------------
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -501,7 +702,7 @@ def customers():
 
     return render_template('customers.html', customers=customers)
 
-'''Add Customer'''
+'''Add Customer button'''
 @app.route('/add_customer', methods=['POST'])
 def add_customer():
     name = request.form['name']
@@ -522,6 +723,10 @@ def add_customer():
 def receivables():
     if 'user_id' not in session:
         return redirect('/login')
+    #-------------------------------------------------------------
+    if session.get('role') not in ['admin', 'Sales']:
+        return redirect('/unauthorized')
+    #------------------------------------------------------------
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -546,6 +751,10 @@ def receivables():
 def pay_receivable(id):
     if 'user_id' not in session:
         return redirect('/login')
+    #-------------------------------------------------------------
+    if session.get('role') not in ['admin', 'Sales']:
+        return redirect('/unauthorized')
+    #------------------------------------------------------------
 
     amount = float(request.form['amount'])
     
@@ -586,6 +795,10 @@ def pay_receivable(id):
 def customer_balance(customer_id):
     if 'user_id' not in session:
         return redirect('/login')
+    #-------------------------------------------------------------
+    if session.get('role') not in ['admin', 'Sales']:
+        return redirect('/unauthorized')
+    #------------------------------------------------------------
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -613,6 +826,10 @@ def customer_balance(customer_id):
 def payment_history(receivable_id):
     if 'user_id' not in session:
         return redirect('/login')
+    #-------------------------------------------------------------
+    if session.get('role') not in ['admin', 'Sales']:
+        return redirect('/unauthorized')
+    #------------------------------------------------------------
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -629,13 +846,24 @@ def payment_history(receivable_id):
 
     return render_template('payment_history.html', payments=payments)
 
-'''REPORT ROUTE'''
+
+
+
+
+
+
+'''REPORT SYSTEM V2'''
 from datetime import datetime, timedelta
 
 @app.route('/reports')
 def reports():
+
     if 'user_id' not in session:
         return redirect('/login')
+    # -------------------------------------------
+    if session.get('role') != 'admin':
+        return redirect('/unauthorized')
+    #--------------------------------------------
 
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
@@ -647,91 +875,135 @@ def reports():
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
 
-    # 🔵 TODAY
+    # =====================================================
+    # SALES SUMMARY
+    # =====================================================
+
+    # TODAY SALES
     cursor.execute("""
-        SELECT SUM(total_amount)
+        SELECT IFNULL(SUM(total_amount), 0)
         FROM sales
         WHERE DATE(created_at) = %s
     """, (today,))
-    today_sales = cursor.fetchone()[0] or 0
+    today_sales = cursor.fetchone()[0]
 
-    # 🔵 WEEK
+    # WEEK SALES
     cursor.execute("""
-        SELECT SUM(total_amount)
+        SELECT IFNULL(SUM(total_amount), 0)
         FROM sales
         WHERE created_at >= %s
     """, (week_ago,))
-    weekly_sales = cursor.fetchone()[0] or 0
+    weekly_sales = cursor.fetchone()[0]
 
-    # 🔵 MONTH
+    # MONTH SALES
     cursor.execute("""
-        SELECT SUM(total_amount)
+        SELECT IFNULL(SUM(total_amount), 0)
         FROM sales
         WHERE created_at >= %s
     """, (month_ago,))
-    monthly_sales = cursor.fetchone()[0] or 0
+    monthly_sales = cursor.fetchone()[0]
 
-    # 🔥 FILTER CONDITION
-    filter_sql = ""
+    # =====================================================
+    # FILTER
+    # =====================================================
+
     params = []
 
+    sale_filter = ""
     if start_date and end_date:
-        filter_sql = "WHERE DATE(created_at) BETWEEN %s AND %s"
+        sale_filter = "WHERE DATE(s.created_at) BETWEEN %s AND %s"
         params = [start_date, end_date]
 
-    # 🔵 REVENUE
-    query = "SELECT SUM(total_amount) FROM sales " + filter_sql
-    cursor.execute(query, params)
-    total_revenue = cursor.fetchone()[0] or 0
+    # =====================================================
+    # TOTAL REVENUE
+    # =====================================================
 
-    # 🔵 PROFIT (FIXED JOIN WITH SALES)
-    profit_query = """
-        SELECT SUM((si.unit_price - (p.buying_price + p.extra_cost)) * si.quantity)
-        FROM sale_items si
-        JOIN products p ON si.product_id = p.id
-        JOIN sales s ON si.sale_id = s.id
+    revenue_query = f"""
+        SELECT IFNULL(SUM(s.total_amount), 0)
+        FROM sales s
+        {sale_filter}
     """
 
-    if start_date and end_date:
-        profit_query += " WHERE DATE(s.created_at) BETWEEN %s AND %s"
+    cursor.execute(revenue_query, params)
+    total_revenue = cursor.fetchone()[0]
+
+    # =====================================================
+    # TOTAL PROFIT
+    # =====================================================
+
+    profit_query = f"""
+        SELECT IFNULL(
+            SUM(
+                (si.unit_price - si.cost_price) * si.quantity
+            ),
+        0)
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.id
+        {sale_filter}
+    """
 
     cursor.execute(profit_query, params)
-    total_profit = cursor.fetchone()[0] or 0
+    total_profit = cursor.fetchone()[0]
 
-    # 🔵 CHART
-    chart_query = """
-        SELECT DATE(created_at), SUM(total_amount)
-        FROM sales
+    # =====================================================
+    # TOTAL ITEMS SOLD
+    # =====================================================
+
+    items_query = f"""
+        SELECT IFNULL(SUM(si.quantity), 0)
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.id
+        {sale_filter}
     """
 
+    cursor.execute(items_query, params)
+    total_items_sold = cursor.fetchone()[0]
+
+    # =====================================================
+    # SALES CHART
+    # =====================================================
+
     if start_date and end_date:
-        chart_query += " WHERE DATE(created_at) BETWEEN %s AND %s"
-        cursor.execute(chart_query + " GROUP BY DATE(created_at)", params)
+
+        cursor.execute(f"""
+            SELECT DATE(s.created_at), SUM(s.total_amount)
+            FROM sales s
+            {sale_filter}
+            GROUP BY DATE(s.created_at)
+            ORDER BY DATE(s.created_at)
+        """, params)
+
     else:
+
         cursor.execute("""
             SELECT DATE(created_at), SUM(total_amount)
             FROM sales
             WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
             GROUP BY DATE(created_at)
+            ORDER BY DATE(created_at)
         """)
 
-    daily_sales_data = cursor.fetchall()
+    chart_data = cursor.fetchall()
 
-    dates = [str(row[0]) for row in daily_sales_data]
-    amounts = [float(row[1]) for row in daily_sales_data]
+    dates = [str(row[0]) for row in chart_data]
+    amounts = [float(row[1]) for row in chart_data]
 
-    # 🔵 TOP PRODUCTS (FIXED JOIN)
-    top_query = """
-        SELECT p.name, SUM(si.quantity)
+    # =====================================================
+    # TOP PRODUCTS
+    # =====================================================
+
+    top_query = f"""
+        SELECT 
+            p.name,
+            SUM(si.quantity) AS total_qty
         FROM sale_items si
         JOIN products p ON si.product_id = p.id
         JOIN sales s ON si.sale_id = s.id
+        {sale_filter}
+        GROUP BY p.name
+        ORDER BY total_qty DESC
+        LIMIT 5
     """
-
-    if start_date and end_date:
-        top_query += " WHERE DATE(s.created_at) BETWEEN %s AND %s"
-
-    top_query += " GROUP BY p.name ORDER BY SUM(si.quantity) DESC LIMIT 5"
 
     cursor.execute(top_query, params)
     top_products = cursor.fetchall()
@@ -740,44 +1012,38 @@ def reports():
 
     return render_template(
         'reports.html',
+
         today_sales=today_sales,
         weekly_sales=weekly_sales,
         monthly_sales=monthly_sales,
+
         total_revenue=total_revenue,
         total_profit=total_profit,
+
+        total_items_sold=total_items_sold,
+
         dates=dates,
         amounts=amounts,
+
         top_products=top_products,
+
         start_date=start_date,
         end_date=end_date
     )
 
 
-'''PAYABLES PAGE
+
+
+'''PAYABLES PAGE'''
 @app.route('/payables')
 def payables():
+
     if 'user_id' not in session:
         return redirect('/login')
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT p.id, s.name, p.amount_due
-        FROM payables p
-        LEFT JOIN suppliers s ON p.supplier_id = s.id
-        WHERE p.amount_due > 0
-    """)
-    payables = cursor.fetchall()
-
-    conn.close()
-
-    return render_template('payables.html', payables=payables)'''
-
-@app.route('/payables')
-def payables():
-    if 'user_id' not in session:
-        return redirect('/login')
+    #================================================================
+    if session.get('role') not in ['admin', 'purchaser']:
+        return redirect('/unauthorized')
+    #================================================================
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -785,30 +1051,49 @@ def payables():
     cursor.execute("""
         SELECT 
             p.id,
+
             s.name AS supplier_name,
+
             pr.name AS product_name,
+
             pi.quantity,
-            pi.unit_cost,
+
+            (pi.buying_price + pi.extra_cost) AS unit_cost,
+
             p.amount_due,
-            pu.created_at
+
+            pu.created_at,
+
+            pi.description
 
         FROM payables p
 
-        LEFT JOIN suppliers s ON p.supplier_id = s.id
-        LEFT JOIN purchases pu ON p.purchase_id = pu.id
-        LEFT JOIN purchase_items pi ON pu.id = pi.purchase_id
-        LEFT JOIN products pr ON pi.product_id = pr.id
+        LEFT JOIN suppliers s
+            ON p.supplier_id = s.id
 
-        WHERE p.amount_due > 0
-        AND p.purchase_id IS NOT NULL
+        LEFT JOIN purchases pu
+            ON p.purchase_id = pu.id
+
+        LEFT JOIN purchase_items pi
+            ON pu.id = pi.purchase_id
+
+        LEFT JOIN products pr
+            ON pi.product_id = pr.id
+
+        WHERE p.purchase_id IS NOT NULL
 
         ORDER BY pu.created_at DESC
     """)
 
     payables = cursor.fetchall()
+
     conn.close()
 
-    return render_template('payables.html', payables=payables)
+    return render_template(
+        'payables.html',
+        payables=payables
+    )
+
 
 
 
@@ -817,6 +1102,10 @@ def payables():
 def pay_payable(id):
     if 'user_id' not in session:
         return redirect('/login')
+    #================================================================
+    if session.get('role') not in ['admin', 'purchaser']:
+        return redirect('/unauthorized')
+    #================================================================
 
     try:
         amount = float(request.form['amount'])
@@ -877,60 +1166,55 @@ def pay_payable(id):
         conn.close()
         return redirect('/payables?error=server')
     
-    
-'''PAYABLE PAYMENT HISTORY
+
+
+
+
+'''payable_history page'''
 @app.route('/payable_history/<int:id>')
 def payable_history(id):
+
     if 'user_id' not in session:
         return redirect('/login')
+    #================================================================
+    if session.get('role') not in ['admin', 'purchaser']:
+        return redirect('/unauthorized')
+    #================================================================
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT amount_paid, payment_link, created_at
-        FROM payable_payments
-        WHERE payable_id=%s
-    """, (id,))
-
-    payments = cursor.fetchall()
-
-    conn.close()
-
-    return render_template('payable_history.html', payments=payments)
-    '''
-@app.route('/payable_history/<int:id>')
-def payable_history(id):
-    if 'user_id' not in session:
-        return redirect('/login')
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # 🔵 1. GET PURCHASE INFO
+    # 🔵 PURCHASE INFO
     cursor.execute("""
         SELECT 
             s.name,
             pr.name,
             pi.quantity,
-            pi.unit_cost,
-            p.amount_due + IFNULL(SUM(pp.amount_paid), 0) AS original_amount,
-            pu.created_at
+            (pi.buying_price + pi.extra_cost) AS unit_cost,
+            (pi.buying_price * pi.quantity) AS original_amount,
+            pu.created_at,
+            pi.description
+
         FROM payables p
-        LEFT JOIN suppliers s ON p.supplier_id = s.id
-        LEFT JOIN purchases pu ON p.purchase_id = pu.id
-        LEFT JOIN purchase_items pi ON pu.id = pi.purchase_id
-        LEFT JOIN products pr ON pi.product_id = pr.id
-        LEFT JOIN payable_payments pp ON p.id = pp.payable_id
+        LEFT JOIN suppliers s
+            ON p.supplier_id = s.id
+        LEFT JOIN purchases pu
+            ON p.purchase_id = pu.id
+        LEFT JOIN purchase_items pi
+            ON pu.id = pi.purchase_id
+        LEFT JOIN products pr
+            ON pi.product_id = pr.id
         WHERE p.id = %s
-        GROUP BY p.id, pr.name, pi.quantity, pi.unit_cost, pu.created_at, s.name
     """, (id,))
 
     purchase = cursor.fetchone()
 
-    # 🔵 2. GET PAYMENTS
+    # 🔴 PAYMENT HISTORY
     cursor.execute("""
-        SELECT amount_paid, payment_link, created_at
+        SELECT 
+            amount_paid,
+            payment_link,
+            created_at
         FROM payable_payments
         WHERE payable_id = %s
         ORDER BY created_at ASC
@@ -946,21 +1230,28 @@ def payable_history(id):
         payments=payments
     )
 
+
 '''SUPPLIERS'''
 @app.route('/suppliers')
 def suppliers():
     if 'user_id' not in session:
         return redirect('/login')
+    #================================================================
+    if session.get('role') not in ['admin', 'purchaser']:
+        return redirect('/unauthorized')
+    #================================================================
 
     conn = get_db_connection()
     cursor = conn.cursor()
-
     cursor.execute("SELECT * FROM suppliers")
     suppliers = cursor.fetchall()
-
     conn.close()
-
     return render_template('suppliers.html', suppliers=suppliers)
+
+
+
+
+
 
 '''ADD SUPPLIERS'''
 @app.route('/add_supplier', methods=['POST'])
@@ -1065,173 +1356,186 @@ def dashboard():
 
 
 
-'''PURCHASE ROUTE'''
-# 🔵 PURCHASE PAGE
-@app.route('/purchase')
-def purchase():
+
+'''PURCHASE PAGE V2'''
+@app.route('/purchase/<int:product_id>')
+def purchase(product_id):
+
+    if 'user_id' not in session:
+        return redirect('/login')
+    #================================================================
+    if session.get('role') not in ['admin', 'purchaser']:
+        return redirect('/unauthorized')
+    #================================================================
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 🔵 GET PRODUCT
+    cursor.execute("""
+        SELECT products.id,
+               products.name,
+               categories.name
+        FROM products
+        LEFT JOIN categories
+        ON products.category_id = categories.id
+        WHERE products.id = %s
+    """, (product_id,))
+
+    product = cursor.fetchone()
+
+    # 🔵 GET SUPPLIERS
+    cursor.execute("SELECT * FROM suppliers")
+    suppliers = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'purchase.html',
+        product=product,
+        suppliers=suppliers
+    )
+
+
+
+
+
+
+
+'''COMPLETE PURCHASE V2'''
+@app.route('/complete_purchase', methods=['POST'])
+def complete_purchase():
+
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    product_id = request.form['product_id']
+    supplier_id = request.form['supplier_id']
+
+    buying_price = float(request.form['buying_price'])
+    extra_cost = float(request.form['extra_cost'])
+
+    quantity = int(request.form['quantity'])
+
+    selling_price = float(request.form['selling_price'])
+
+    description = request.form['description']
+
+    is_credit = request.form.get('is_credit') == 'on'
+
+    supplier_payable_amount = buying_price * quantity
+
+    # 🔥 TOTAL COST
+    unit_cost = buying_price + extra_cost
+    total_amount = unit_cost * quantity
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+
+        # 🔵 CREATE PURCHASE
+        cursor.execute("""
+            INSERT INTO purchases
+            (supplier_id, total_amount, is_credit)
+            VALUES (%s, %s, %s)
+        """, (supplier_id, total_amount, is_credit))
+
+        purchase_id = cursor.lastrowid
+
+        # 🔵 CREATE PURCHASE ITEM
+        cursor.execute("""
+            INSERT INTO purchase_items
+            (
+                purchase_id,
+                product_id,
+                quantity,
+                buying_price,
+                extra_cost,
+                selling_price,
+                description
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            purchase_id,
+            product_id,
+            quantity,
+            buying_price,
+            extra_cost,
+            selling_price,
+            description
+        ))
+
+        # 🔵 UPDATE STOCK
+        cursor.execute("""
+            UPDATE products
+            SET quantity = quantity + %s
+            WHERE id = %s
+        """, (quantity, product_id))
+
+        # 🔴 CREATE PAYABLE
+        if is_credit:
+
+            cursor.execute("""
+                INSERT INTO payables
+                (supplier_id, purchase_id, amount_due)
+                VALUES (%s, %s, %s)
+            """, (
+                supplier_id,
+                purchase_id,
+                supplier_payable_amount
+            ))
+
+        conn.commit()
+        conn.close()
+
+        return redirect('/inventory')
+
+    except Exception as e:
+
+        conn.rollback()
+        conn.close()
+
+        return f"ERROR: {str(e)}"
+
+
+'''Supplier Dashboard'''
+@app.route('/supplier_dashboard')
+def supplier_dashboard():
     if 'user_id' not in session:
         return redirect('/login')
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Get products (only active ones ideally)
-    cursor.execute("SELECT * FROM products")
-    products = cursor.fetchall()
+    # 🔵 Get total due per supplier
+    cursor.execute("""
+        SELECT 
+            s.id,
+            s.name,
+            IFNULL(SUM(p.amount_due), 0) as total_due
+        FROM suppliers s
+        LEFT JOIN payables p ON s.id = p.supplier_id
+        GROUP BY s.id, s.name
+        ORDER BY total_due DESC
+    """)
 
-    # Get suppliers
-    cursor.execute("SELECT * FROM suppliers")
     suppliers = cursor.fetchall()
+
+    # 🔵 Get total exposure
+    cursor.execute("""
+        SELECT IFNULL(SUM(amount_due), 0) FROM payables
+    """)
+    total_exposure = cursor.fetchone()[0]
 
     conn.close()
 
-    return render_template('purchase.html',
-                           products=products,
-                           suppliers=suppliers)
+    return render_template(
+        'supplier_dashboard.html',
+        suppliers=suppliers,
+        total_exposure=total_exposure
+    )
 
-'''COMPLETE PURCHASE Older version
-# 🔴 COMPLETE PURCHASE
-@app.route('/complete_purchase', methods=['POST'])
-def complete_purchase():
-    if 'user_id' not in session:
-        return {"status": "error", "message": "Unauthorized"}
-
-    data = request.get_json()
-
-    cart = data.get('cart')
-    supplier_id = data.get('supplier_id')
-    is_credit = data.get('is_credit')
-
-    if not cart or not supplier_id:
-        return {"status": "error", "message": "Missing data"}
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    try:
-        total_amount = 0
-
-        # 🔥 Calculate total first
-        for item in cart.values():
-            total_amount += item['qty'] * item['cost']
-
-        # 🔵 1. INSERT INTO purchases
-        cursor.execute("""
-            INSERT INTO purchases (supplier_id, total_amount, is_credit)
-            VALUES (%s, %s, %s)
-        """, (supplier_id, total_amount, is_credit))
-
-        purchase_id = cursor.lastrowid
-
-        # 🔵 2. LOOP purchase_items + UPDATE STOCK
-        for product_id, item in cart.items():
-
-            qty = int(item['qty'])
-            cost = float(item['cost'])
-
-            # Insert purchase item
-            cursor.execute("""
-                INSERT INTO purchase_items (purchase_id, product_id, quantity, unit_cost)
-                VALUES (%s, %s, %s, %s)
-            """, (purchase_id, product_id, qty, cost))
-
-            # Update stock
-            cursor.execute("""
-                UPDATE products
-                SET quantity = quantity + %s
-                WHERE id = %s
-            """, (qty, product_id))
-
-        # 🔴 3. CREATE PAYABLE (ONLY IF CREDIT)
-        if is_credit:
-            cursor.execute("""
-                INSERT INTO payables (supplier_id, amount_due)
-                VALUES (%s, %s)
-            """, (supplier_id, total_amount))
-
-        conn.commit()
-        conn.close()
-
-        return {"status": "success"}
-
-    except Exception as e:
-        conn.rollback()
-        conn.close()
-        return {"status": "error", "message": str(e)}
-'''
-
-
-
-'''COMPLETE PURCHASE (FINAL CLEAN VERSION)'''
-@app.route('/complete_purchase', methods=['POST'])
-def complete_purchase():
-    if 'user_id' not in session:
-        return {"status": "error", "message": "Unauthorized"}
-
-    data = request.get_json()
-
-    cart = data.get('cart')
-    supplier_id = data.get('supplier_id')
-    is_credit = data.get('is_credit')
-
-    if not cart or not supplier_id:
-        return {"status": "error", "message": "Missing data"}
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    try:
-        total_amount = 0
-
-        # 🔥 1. CALCULATE TOTAL
-        for item in cart.values():
-            qty = int(item['qty'])
-            cost = float(item['cost'])
-            total_amount += qty * cost
-
-        # 🔵 2. CREATE PURCHASE
-        cursor.execute("""
-            INSERT INTO purchases (supplier_id, total_amount, is_credit)
-            VALUES (%s, %s, %s)
-        """, (supplier_id, total_amount, is_credit))
-
-        purchase_id = cursor.lastrowid  # 🔥 VERY IMPORTANT
-
-        # 🔵 3. INSERT ITEMS + UPDATE STOCK
-        for product_id, item in cart.items():
-
-            qty = int(item['qty'])
-            cost = float(item['cost'])
-
-            # Insert purchase item
-            cursor.execute("""
-                INSERT INTO purchase_items (purchase_id, product_id, quantity, unit_cost)
-                VALUES (%s, %s, %s, %s)
-            """, (purchase_id, product_id, qty, cost))
-
-            # Update stock
-            cursor.execute("""
-                UPDATE products
-                SET quantity = quantity + %s
-                WHERE id = %s
-            """, (qty, product_id))
-
-        # 🔴 4. CREATE PAYABLE (FIXED VERSION)
-        if is_credit:
-            cursor.execute("""
-                INSERT INTO payables (supplier_id, purchase_id, amount_due)
-                VALUES (%s, %s, %s)
-            """, (supplier_id, purchase_id, total_amount))
-
-        conn.commit()
-        conn.close()
-
-        return {"status": "success"}
-
-    except Exception as e:
-        conn.rollback()
-        conn.close()
-        return {"status": "error", "message": str(e)}
 
 
 if __name__ == '__main__':

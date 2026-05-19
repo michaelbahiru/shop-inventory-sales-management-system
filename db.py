@@ -1,13 +1,26 @@
+import os
 import mysql.connector
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 def get_db_connection():
     connection = mysql.connector.connect(
-        host="localhost",
-        user="root",          # change if needed
-        password="MB01@MySQL",
-        database="shop_management"
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        database=os.getenv("DB_NAME")
     )
+
     return connection
+
+
+
+
+
+
+
 
 
 ''' Why this file (db.py) separated?
@@ -15,6 +28,13 @@ def get_db_connection():
 👉 Keeps database logic separate
 👉 Reusable across all modules
 👉 Clean architecture (very important later) '''
+
+
+
+
+
+
+
 
 '''
 Database Query:

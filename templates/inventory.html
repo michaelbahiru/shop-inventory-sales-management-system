@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Inventory</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
     <!-- 🔥 IMPORTANT FOR MOBILE -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -78,168 +79,180 @@
                 </div>
             </div>
 
-            <!-- Add Product-->
-            <div class="card mb-3">
+            <!-- Add Product -->
+             <div class="card mb-3">
                 <div class="card-body">
                     <h5>Add Product</h5>
                     <form method="POST" action="/add_product">
-                        <select name="category_id" class="form-select mb-2" required>
-                            <option value="">Select Category</option>
-                            {% for cat in categories %}
-                            <option value="{{ cat[0] }}">{{ cat[1] }}</option>
-                            {% endfor %}
-                        </select>
-                        
-                        <select name="supplier_id" class="form-select mb-2" required>
-                            <option value="">Select Supplier</option>
-                            {% for sup in suppliers %}
-                            <option value="{{ sup[0] }}">{{ sup[1] }}</option>
-                            {% endfor %}
-                        </select>
-                        
-                        <input type="text" name="name" class="form-control mb-2" placeholder="Product Name" required>
-                        
-                        <input type="number" step="0.01" name="buying_price" class="form-control mb-2" placeholder="Buying Price">
-                        
-                        <input type="number" step="0.01" name="extra_cost" class="form-control mb-2" placeholder="Extra Cost">
-                        
-                        <input type="number" step="0.01" name="selling_price" class="form-control mb-2" placeholder="Selling Price" required>
-                        
-                        <button class="btn btn-success w-100 btn-lg">Add Product</button>
-                    
-                    </form>
-                    <!--
-                    <h5>Add Product</h5>
+                        <select name="category_id"
+                        class="form-select mb-2"
+                        required>
+                        <option value="">Select Category</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat[0] }}">
+                            {{ cat[1] }}
+                        </option>
+                        {% endfor %}
+                    </select>
 
-                    <form method="POST" action="/add_product">
+            
+                    <input type="text"
+                    name="name"
+                    class="form-control mb-2"  
+                    placeholder="Product Name"
+                    required>
+                    <button class="btn btn-success w-100 btn-lg">
+                        Add Product
+                    </button>
 
-                        <select name="category_id" class="form-select mb-2" required>
-                            <option value="">Select Category</option>
-                            {% for cat in categories %}
-                            <option value="{{ cat[0] }}">{{ cat[1] }}</option>
-                            {% endfor %}
-                        </select>
+                </form>
 
-                        <select name="supplier_id" class="form-select mb-2" required>
-                            <option value="">Select Supplier</option>
-                            {% for sup in suppliers %}
-                            <option value="{{ sup[0] }}">{{ sup[1] }}</option>
-                            {% endfor %}
-                        </select>
-
-                        <input type="text" name="name" class="form-control mb-2" placeholder="Product Name" required>
-
-                        <input type="number" step="0.01" name="buying_price" class="form-control mb-2" placeholder="Buying Price" required>
-
-                        <input type="number" step="0.01" name="extra_cost" class="form-control mb-2" placeholder="Extra Cost" required>
-
-                        <input type="number" step="0.01" name="selling_price" class="form-control mb-2" placeholder="Selling Price" required>
-
-                        
-
-                        <button class="btn btn-success w-100 btn-lg">Add Product</button>
-                        
-                    </form>
-                        -->
-
-                   
-                </div>
             </div>
 
         </div>
+    </div>
 
-        <!-- RIGHT SIDE -->
-        <div class="col-12 col-md-8">
+    <!-- RIGHT SIDE -->
+<div class="col-12 col-md-8">
 
-            <!-- Summary -->
-            <div class="card mb-3">
-                <div class="card-body">
+    <!-- SUMMARY -->
+    <div class="card mb-3">
+        <div class="card-body">
 
-                    <h5>Inventory Summary</h5>
+            <h5>Inventory Summary</h5>
 
-                    <p><strong>Total Quantity:</strong> {{ total_quantity }}</p>
-                    <p><strong>Total Stock Value:</strong> {{ total_stock_value }}</p>
-                    <p><strong>Expected Profit:</strong> {{ total_expected_profit }}</p>
-
-                </div>
-            </div>
-
-            <!-- 🔴 MOBILE VIEW (CARDS) -->
-            <div class="mobile-cards">
-
-                {% for item in inventory %}
-                <div class="product-card shadow-sm">
-
-                    <h6>{{ item[1] }}</h6>
-                    <p>Category: {{ item[2] }}</p>
-                    <p>Price: {{ item[3] }}</p>
-
-                    <p>
-                        Stock: {{ item[4] }}
-                        {% if item[4] <= 5 %}
-                        <span class="badge bg-danger">Low</span>
-                        {% endif %}
-                    </p>
-
-                    <div class="d-grid gap-2">
-                        <a href="/edit_product/{{ item[0] }}" class="btn btn-primary btn-sm">Edit</a>
-                        <a href="/delete_product/{{ item[0] }}" class="btn btn-danger btn-sm"
-                           onclick="return confirm('Are you sure?')">Delete</a>
-                        <a href="/add_stock/{{ item[0] }}" class="btn btn-success btn-sm">+ Stock</a>
-                    </div>
-
-                </div>
-                {% endfor %}
-
-            </div>
-
-            <!-- 🔵 DESKTOP TABLE -->
-            <div class="card desktop-table">
-                <div class="card-body">
-
-                    <h5>Inventory List</h5>
-
-                    <table class="table table-bordered">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Item</th>
-                                <th>Category</th>
-                                <th>Price</th>
-                                <th>Stock</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {% for item in inventory %}
-                            <tr>
-                                <td>{{ item[1] }}</td>
-                                <td>{{ item[2] }}</td>
-                                <td>{{ item[3] }}</td>
-                                <td>
-                                    {{ item[4] }}
-                                    {% if item[4] <= 5 %}
-                                    <span class="badge bg-danger">Low</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <a href="/edit_product/{{ item[0] }}" class="btn btn-sm btn-primary">Edit</a>
-                                    <a href="/delete_product/{{ item[0] }}" class="btn btn-sm btn-danger"
-                                       onclick="return confirm('Are you sure?')">Delete</a>
-                                    <a href="/add_stock/{{ item[0] }}" class="btn btn-sm btn-success">+ Stock</a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-
-                    </table>
-
-                </div>
-            </div>
+            <p>
+                <strong>Total Quantity:</strong>
+                {{ total_quantity }}
+            </p>
 
         </div>
+    </div>
+
+    <!-- MOBILE VIEW -->
+    <div class="d-block d-md-none">
+
+        {% for item in inventory %}
+
+        <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+
+                <h5>{{ item[1] }}</h5>
+
+                <p>
+                    <strong>Category:</strong>
+                    {{ item[2] }}
+                </p>
+
+                <p>
+                    <strong>Latest Price:</strong>
+
+                    {% if item[4] %}
+                        {{ item[4] }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </p>
+
+                <p>
+                    <strong>Stock:</strong>
+                    {{ item[3] }}
+
+                    {% if item[3] <= 5 %}
+                    <span class="badge bg-danger">Low</span>
+                    {% endif %}
+                </p>
+
+                <div class="d-grid gap-2">
+
+                    <a href="/edit_product/{{ item[0] }}"
+                       class="btn btn-primary btn-sm">
+                       Edit
+                    </a>
+
+                    <a href="/purchase/{{ item[0] }}"
+                       class="btn btn-success btn-sm">
+                       Purchase
+                    </a>
+
+                </div>
+
+            </div>
+        </div>
+
+        {% endfor %}
 
     </div>
+
+    <!-- DESKTOP TABLE -->
+    <div class="table-responsive d-none d-md-block">
+
+        <table class="table table-bordered">
+
+            <thead class="table-dark">
+                <tr>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Latest Price</th>
+                    <th>Stock</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+            {% for item in inventory %}
+
+            <tr>
+
+                <td>{{ item[1] }}</td>
+
+                <td>{{ item[2] }}</td>
+
+                <td>
+                    {% if item[4] %}
+                        {{ item[4] }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+
+                <td>
+                    {{ item[3] }}
+
+                    {% if item[3] <= 5 %}
+                    <span class="badge bg-danger">Low</span>
+                    {% endif %}
+                </td>
+
+                <td>
+
+                    <a href="/edit_product/{{ item[0] }}"
+                       class="btn btn-sm btn-primary">
+                       Edit
+                    </a>
+
+                    <a href="/purchase/{{ item[0] }}"
+                       class="btn btn-sm btn-success">
+                       Purchase
+                    </a>
+
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+            
+
+    
 
 </div>
 

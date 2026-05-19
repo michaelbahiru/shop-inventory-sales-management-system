@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Management Portal</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -72,6 +73,7 @@
         .sales { border-left: 5px solid #27ae60; }
         .receivable { border-left: 5px solid #2980b9; }
         .reports { border-left: 5px solid #95a5a6; }
+        .Staff_add { border-left: 5px solid #64cdd4; }
 
         .logout-btn {
             margin-top: 10px;
@@ -83,6 +85,20 @@
         .logout-btn:hover {
             background-color: #e74c3c;
         }
+
+        .Register-btn {
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 14px;
+            font-size: 1rem;
+            font-weight: 500;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -91,14 +107,16 @@
     <h1>Management Portal ሱቅ ማስተዳደሪያ</h1>
     
     <div class="button-stack">
-        <a href="/dashboard" class="mgmt-btn suppliers">Dashboard / አጠቃላይ መገምገሚያ</a>
+        <a href="/dashboard" class="mgmt-btn dashboard">Dashboard / አጠቃላይ መገምገሚያ</a>
         <a href="/suppliers" class="mgmt-btn suppliers">Suppliers Management / እቃ አቅራቢዎች</a>
         <a href="/inventory" class="mgmt-btn inventory">Inventory Management / እቃ መቆጣጠሪያ</a>
         <a href="/payables" class="mgmt-btn payables">Accounts Payable / እዳ መቆጣጠሪያ</a>
         <a href="/customers" class="mgmt-btn customers">Customer Management / ደንበኞች</a>
         <a href="/sales" class="mgmt-btn sales">Sales & POS / እቃ መሸጫ</a>
         <a href="/receivables" class="mgmt-btn receivable">Accounts Receivable / ዱቤ መቆጣጠሪያ</a>
-        <a href="/reports" class="mgmt-btn reports">Business Reports / ሪፖርት </a>
+        <a href="/reports" class="mgmt-btn reports">Business Reports / ሪፖርት </a><br>
+        <a href="/register" class="mgmt-btn Staff_add">Create New staff</a>
+
         
         <a href="/logout" class="mgmt-btn logout-btn">Logout / ዝግተህ ውጣ(ውጪ)</a>
     </div>

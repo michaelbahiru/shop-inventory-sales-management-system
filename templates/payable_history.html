@@ -1,73 +1,326 @@
 <!DOCTYPE html>
 <html>
 <head>
+
     <title>Payable Ledger</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+
+        .ledger-card{
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+        }
+
+        .desktop-table{
+            display: block;
+        }
+
+        .mobile-view{
+            display: none;
+        }
+
+        @media(max-width:768px){
+
+            .desktop-table{
+                display: none;
+            }
+
+            .mobile-view{
+                display: block;
+            }
+
+        }
+
+    </style>
+
 </head>
+
 <body class="bg-light">
 
 <div class="container mt-4">
 
-<a href="/payables" class="btn btn-secondary mb-3">← Back</a>
+    <!-- BACK -->
+    <a href="/payables" class="btn btn-secondary mb-3 w-100">
+        ← Back
+    </a>
 
-<h4>Supplier Ledger</h4>
+    <!-- TITLE -->
+    <div class="card mb-3 shadow-sm">
 
-<!-- 🔵 PURCHASE INFO -->
-<div class="card mb-3">
-    <div class="card-body">
-        <strong>Supplier:</strong> {{ purchase[0] }} <br>
-        <strong>Product:</strong> {{ purchase[1] }} <br>
-        <strong>Quantity:</strong> {{ purchase[2] }} <br>
-        <strong>Unit Cost:</strong> {{ purchase[3] }} <br>
-        <strong>Total Amount:</strong> {{ purchase[4] }} <br>
-        <strong>Date:</strong> {{ purchase[5] }}
+        <div class="card-body">
+
+            <h3 class="mb-0">
+                Supplier Ledger
+            </h3>
+
+        </div>
+
     </div>
-</div>
 
-<!-- 🔴 LEDGER TABLE -->
-<table class="table table-bordered">
-    <thead class="table-dark">
-        <tr>
-            <th>Date</th>
-            <th>Description</th>
-            <th>Debit (You Owe)</th>
-            <th>Credit (Payment)</th>
-            <!--<th>Balance</th>-->
-        </tr>
-    </thead>
-    <tbody>
+    <!-- PURCHASE INFO -->
+    <div class="card mb-3 shadow-sm">
 
-        <!-- 🔵 INITIAL PURCHASE -->
+        <div class="card-body">
+
+            <div class="row">
+
+                <div class="col-md-6">
+
+                    <p>
+                        <strong>Supplier:</strong>
+                        {{ purchase[0] }}
+                    </p>
+
+                    <p>
+                        <strong>Product:</strong>
+                        {{ purchase[1] }}
+                    </p>
+
+                    <p>
+                        <strong>Quantity:</strong>
+                        {{ purchase[2] }}
+                    </p>
+
+                    <p>
+                        <strong>Unit Cost:</strong>
+                        {{ purchase[3] }}
+                    </p>
+
+                </div>
+
+                <div class="col-md-6">
+
+                    <p>
+                        <strong>Original Debt:</strong>
+
+                        <span class="text-danger fw-bold">
+                            {{ purchase[4] }}
+                        </span>
+                    </p>
+
+                    <p>
+                        <strong>Date:</strong>
+                        {{ purchase[5] }}
+                    </p>
+
+                    <p>
+                        <strong>Description:</strong>
+
+                        {% if purchase[6] %}
+                            {{ purchase[6] }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- DESKTOP TABLE -->
+    <div class="desktop-table">
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-striped align-middle">
+
+                <thead class="table-dark">
+
+                    <tr>
+
+                        <th>Date</th>
+
+                        <th>Description</th>
+
+                        <th>Debit (Debt)</th>
+
+                        <th>Credit (Payment)</th>
+
+                        <th>Balance</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    <!-- 🔵 INITIAL PURCHASE -->
+                    {% set balance = purchase[4] %}
+
+                    <tr>
+
+                        <td>{{ purchase[5] }}</td>
+
+                        <td>
+                            Initial Purchase
+                        </td>
+
+                        <td class="text-danger fw-bold">
+                            {{ purchase[4] }}
+                        </td>
+
+                        <td>-</td>
+
+                        <td class="fw-bold">
+                            {{ balance }}
+                        </td>
+
+                    </tr>
+
+                    <!-- 🔴 PAYMENTS -->
+                    {% for p in payments %}
+
+                        {% set balance = balance - p[0] %}
+
+                        <tr>
+
+                            <td>{{ p[2] }}</td>
+
+                            <td>
+
+                                {% if p[1] %}
+                                    {{ p[1] }}
+                                {% else %}
+                                    Payment
+                                {% endif %}
+
+                            </td>
+
+                            <td>-</td>
+
+                            <td class="text-success fw-bold">
+                                {{ p[0] }}
+                            </td>
+
+                            <td class="fw-bold">
+
+                                {% if balance <= 0 %}
+                                    <span class="text-success">
+                                        0
+                                    </span>
+                                {% else %}
+                                    <span class="text-danger">
+                                        {{ balance }}
+                                    </span>
+                                {% endif %}
+
+                            </td>
+
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    <!-- MOBILE VIEW -->
+    <div class="mobile-view">
+
         {% set balance = purchase[4] %}
-        <tr>
-            <td>{{ purchase[5] }}</td>
-            <td>Purchase</td>
-            <td>{{ purchase[4] }}</td>
-            <td>-</td>
-            <!--<td><strong>{{ balance }}</strong></td>-->
-        </tr>
 
-        <!-- 🔴 PAYMENTS -->
+        <!-- INITIAL -->
+        <div class="ledger-card shadow-sm">
+
+            <h5>Initial Purchase</h5>
+
+            <p>
+                <strong>Date:</strong>
+                {{ purchase[5] }}
+            </p>
+
+            <p>
+                <strong>Debt:</strong>
+
+                <span class="text-danger fw-bold">
+                    {{ purchase[4] }}
+                </span>
+
+            </p>
+
+            <p>
+                <strong>Balance:</strong>
+
+                <span class="text-danger fw-bold">
+                    {{ balance }}
+                </span>
+
+            </p>
+
+        </div>
+
+        <!-- PAYMENTS -->
         {% for p in payments %}
+
             {% set balance = balance - p[0] %}
-            <tr>
-                <td>{{ p[2] }}</td>
-                <td>{{ p[1] or 'Payment' }}</td>
-                <td>-</td>
-                <td>{{ p[0] }}</td>
-                <!--<td><strong>{{ balance }}</strong></td>-->
-            </tr>
+
+            <div class="ledger-card shadow-sm">
+
+                <h5>
+
+                    {% if p[1] %}
+                        {{ p[1] }}
+                    {% else %}
+                        Payment
+                    {% endif %}
+
+                </h5>
+
+                <p>
+                    <strong>Date:</strong>
+                    {{ p[2] }}
+                </p>
+
+                <p>
+                    <strong>Payment:</strong>
+
+                    <span class="text-success fw-bold">
+                        {{ p[0] }}
+                    </span>
+
+                </p>
+
+                <p>
+                    <strong>Remaining Balance:</strong>
+
+                    {% if balance <= 0 %}
+                        <span class="text-success fw-bold">
+                            0
+                        </span>
+                    {% else %}
+                        <span class="text-danger fw-bold">
+                            {{ balance }}
+                        </span>
+                    {% endif %}
+
+                </p>
+
+            </div>
+
         {% endfor %}
 
-    </tbody>
-</table>
+    </div>
 
 </div>
 
 </body>
 </html>
-
-
 
 
 <!--<!DOCTYPE html>

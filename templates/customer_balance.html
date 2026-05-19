@@ -1,15 +1,74 @@
 <!DOCTYPE html>
-<html>
+<html lang="km">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Balance</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        
+        .card {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.5rem;
+        }
+
+        h3 {
+            color: #e74c3c; 
+            font-size: 1.25rem;
+            margin-bottom: 25px;
+        }
+
+        .back-link {
+            display: inline-block;
+            text-decoration: none;
+            color: #fff;
+            background-color: #3498db;
+            padding: 10px 25px;
+            border-radius: 25px;
+            transition: background 0.3s ease;
+        }
+
+        .back-link:hover {
+            background-color: #2980b9;
+        }
+
+        @media (max-width: 480px) {
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
 </head>
 <body>
 
-<h2>{{ customer[0] }}</h2>
-
-<h3>Total Due: {{ total_due }}</h3>
-
-<a href="/receivables">Back</a>
+    <div class="card">
+        <h2>{{ customer[0] }}</h2>
+        <h3>Total Due: ${{ total_due }}</h3>
+        <a href="/receivables" class="back-link">Back</a>
+    </div>
 
 </body>
 </html>
