@@ -187,19 +187,25 @@ def inventory():
     # 🔥 MAIN INVENTORY QUERY
     query = """
         SELECT
-            p.id,
-            p.name,
-            c.name,
-            p.quantity,
-
-            (
-                SELECT pi.selling_price
-                FROM purchase_items pi
-                WHERE pi.product_id = p.id
-                ORDER BY pi.id DESC
-                LIMIT 1
-            ) AS latest_price
-
+        p.id,
+        p.name,
+        c.name,
+        p.quantity,
+        
+        (
+        SELECT pi.selling_price
+        FROM purchase_items pi
+        WHERE pi.product_id = p.id
+        ORDER BY pi.id DESC
+        LIMIT 1
+        ) AS latest_price,
+        
+        (
+        SELECT COUNT(*)
+        FROM purchase_items pi
+        WHERE pi.product_id = p.id
+        ) AS purchase_count
+        
         FROM products p
         LEFT JOIN categories c
         ON p.category_id = c.id
@@ -295,13 +301,27 @@ def edit_product(id):
 
     if 'user_id' not in session:
         return redirect('/login')
-    #================================================================
+
+    # ================================================================
     if session.get('role') not in ['admin', 'purchaser']:
         return redirect('/unauthorized')
-    #================================================================
+    # ================================================================
 
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    # 🔒 CHECK WHETHER PRODUCT HAS PURCHASE HISTORY
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM purchase_items
+        WHERE product_id = %s
+    """, (id,))
+
+    purchase_count = cursor.fetchone()[0]
+
+    if purchase_count > 0:
+        conn.close()
+        return redirect('/inventory?error=locked')
 
     # 🔵 GET CATEGORIES
     cursor.execute("SELECT * FROM categories")
@@ -340,7 +360,6 @@ def edit_product(id):
         product=product,
         categories=categories
     )
-
 
 
 '''DELETE PRODUCT'''
