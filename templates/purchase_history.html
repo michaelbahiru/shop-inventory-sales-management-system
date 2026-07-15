@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase History</title>
+
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-4">
+
+    <a href="/portal" class="btn btn-secondary mb-3">
+        ← Back
+    </a>
+
+    <h3 class="mb-4">
+        Purchase History / የግዢ ታሪክ
+    </h3>
+
+
+    <!-- ================= MOBILE VIEW ================= -->
+
+    <div class="d-block d-md-none">
+
+        {% for p in purchases %}
+
+        <div class="card shadow-sm mb-3">
+
+            <div class="card-body">
+
+                <h5>{{ p.product }}</h5>
+
+                <p>
+                    <strong>Supplier:</strong>
+                    {{ p.supplier }}
+                </p>
+
+                <p>
+                    <strong>Date:</strong>
+                    {{ p.date }}
+                </p>
+
+                <p>
+                    <strong>Purchased:</strong>
+                    {{ p.purchased_qty }}
+                </p>
+
+                <p>
+                    <strong>Returned:</strong>
+                    {{ p.returned_qty }}
+                </p>
+
+                <p>
+                    <strong>Current Stock:</strong>
+                    {{ p.current_stock }}
+                </p>
+
+                <p>
+                    <strong>Available Return:</strong>
+
+                    {% if p.available_return > 0 %}
+                        <span class="badge bg-success">
+                            {{ p.available_return }}
+                        </span>
+                    {% else %}
+                        <span class="badge bg-secondary">
+                            0
+                        </span>
+                    {% endif %}
+                </p>
+
+                <p>
+                    <strong>Buying Price:</strong>
+
+                    {{ p.buying_price }}
+                </p>
+
+                <p>
+
+                    <strong>Purchase Type:</strong>
+
+                    {% if p.is_credit %}
+                        <span class="badge bg-danger">
+                            Credit
+                        </span>
+                    {% else %}
+                        <span class="badge bg-success">
+                            Cash
+                        </span>
+                    {% endif %}
+
+                </p>
+
+                {% if p.available_return > 0 %}
+
+                <div class="d-grid">
+
+                    <a href="/purchase_return/{{ p.purchase_item_id }}"
+                       class="btn btn-warning">
+
+                        Return Product
+
+                    </a>
+
+                </div>
+
+                {% else %}
+
+                <button
+                    class="btn btn-secondary w-100"
+                    disabled>
+
+                    Nothing to Return
+
+                </button>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+
+
+    <!-- ================= DESKTOP VIEW ================= -->
+
+    <div class="table-responsive d-none d-md-block">
+
+        <table class="table table-bordered table-hover">
+
+            <thead class="table-dark">
+
+            <tr>
+
+                <th>Date</th>
+
+                <th>Supplier</th>
+
+                <th>Product</th>
+
+                <th>Purchased</th>
+
+                <th>Returned</th>
+
+                <th>Current Stock</th>
+
+                <th>Available Return</th>
+
+                <th>Buying Price</th>
+
+                <th>Purchase Type</th>
+
+                <th>Action</th>
+
+            </tr>
+
+            </thead>
+
+            <tbody>
+
+            {% for p in purchases %}
+
+            <tr>
+
+                <td>{{ p.date }}</td>
+
+                <td>{{ p.supplier }}</td>
+
+                <td>{{ p.product }}</td>
+
+                <td>{{ p.purchased_qty }}</td>
+
+                <td>{{ p.returned_qty }}</td>
+
+                <td>{{ p.current_stock }}</td>
+
+                <td>
+
+                    {% if p.available_return > 0 %}
+
+                        <span class="badge bg-success">
+
+                            {{ p.available_return }}
+
+                        </span>
+
+                    {% else %}
+
+                        <span class="badge bg-secondary">
+
+                            0
+
+                        </span>
+
+                    {% endif %}
+
+                </td>
+
+                <td>{{ p.buying_price }}</td>
+
+                <td>
+
+                    {% if p.is_credit %}
+
+                        <span class="badge bg-danger">
+
+                            Credit
+
+                        </span>
+
+                    {% else %}
+
+                        <span class="badge bg-success">
+
+                            Cash
+
+                        </span>
+
+                    {% endif %}
+
+                </td>
+
+                <td>
+
+                    {% if p.available_return > 0 %}
+
+                    <a href="/purchase_return/{{ p.purchase_item_id }}"
+                       class="btn btn-warning btn-sm">
+
+                        Return
+
+                    </a>
+
+                    {% else %}
+
+                    <button
+                        class="btn btn-secondary btn-sm"
+                        disabled>
+
+                        Returned
+
+                    </button>
+
+                    {% endif %}
+
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+</body>
+</html>

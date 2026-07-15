@@ -1059,16 +1059,15 @@ def payables():
 
     if 'user_id' not in session:
         return redirect('/login')
-    #================================================================
+
     if session.get('role') not in ['admin', 'purchaser']:
         return redirect('/unauthorized')
-    #================================================================
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT 
+        SELECT
             p.id,
 
             s.name AS supplier_name,
@@ -1109,10 +1108,9 @@ def payables():
     conn.close()
 
     return render_template(
-        'payables.html',
+        "payables.html",
         payables=payables
     )
-
 
 
 
@@ -1189,23 +1187,27 @@ def pay_payable(id):
 
 
 
-'''payable_history page'''
-@app.route('/payable_history/<int:id>')
-def payable_history(id):
+'''PAYABLE HISTORY PAGE'''
+@app.route('/payable_history/<int:payable_id>')
+def payable_history(payable_id):
 
     if 'user_id' not in session:
         return redirect('/login')
-    #================================================================
+
+    # ================================================================
     if session.get('role') not in ['admin', 'purchaser']:
         return redirect('/unauthorized')
-    #================================================================
+    # ================================================================
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 🔵 PURCHASE INFO
+    # ================================================================
+    # PURCHASE INFORMATION
+    # ================================================================
+
     cursor.execute("""
-        SELECT 
+        SELECT
             s.name,
             pr.name,
             pi.quantity,
@@ -1215,39 +1217,151 @@ def payable_history(id):
             pi.description
 
         FROM payables p
+
         LEFT JOIN suppliers s
             ON p.supplier_id = s.id
+
         LEFT JOIN purchases pu
             ON p.purchase_id = pu.id
+
         LEFT JOIN purchase_items pi
             ON pu.id = pi.purchase_id
+
         LEFT JOIN products pr
             ON pi.product_id = pr.id
-        WHERE p.id = %s
-    """, (id,))
+
+        WHERE p.id=%s
+    """, (payable_id,))
 
     purchase = cursor.fetchone()
 
-    # 🔴 PAYMENT HISTORY
+    # ================================================================
+    # PAYMENT HISTORY
+    # ================================================================
+
     cursor.execute("""
-        SELECT 
+        SELECT
             amount_paid,
             payment_link,
             created_at
+
         FROM payable_payments
-        WHERE payable_id = %s
+
+        WHERE payable_id=%s
+
         ORDER BY created_at ASC
-    """, (id,))
+    """, (payable_id,))
 
     payments = cursor.fetchall()
+
+    # ================================================================
+    # RETURN HISTORY
+    # ================================================================
+
+    cursor.execute("""
+        SELECT
+            pr.refund_amount,
+            pr.returned_quantity,
+            pr.reason,
+            pr.created_at
+
+        FROM purchase_returns pr
+
+        JOIN purchase_items pi
+            ON pr.purchase_item_id = pi.id
+
+        JOIN purchases pu
+            ON pi.purchase_id = pu.id
+
+        JOIN payables pa
+            ON pa.purchase_id = pu.id
+
+        WHERE pa.id=%s
+
+        ORDER BY pr.created_at ASC
+    """, (payable_id,))
+
+    returns = cursor.fetchall()
+
+    # ================================================================
+    # BUILD LEDGER
+    # ================================================================
+
+    ledger = []
+
+    ledger.append({
+        "date": purchase[5],
+        "description": "Initial Purchase",
+        "debit": float(purchase[4]),
+        "credit": 0,
+        "type": "purchase"
+    })
+
+    # Product Returns
+    for r in returns:
+
+        ledger.append({
+
+            "date": r[3],
+
+            "description":
+                f"Returned {r[1]} item(s)"
+                if not r[2]
+                else r[2],
+
+            "debit": 0,
+
+            "credit": float(r[0]),
+
+            "type": "return"
+
+        })
+
+    # Payments
+    for p in payments:
+
+        ledger.append({
+
+            "date": p[2],
+
+            "description":
+                p[1] if p[1] else "Payment",
+
+            "debit": 0,
+
+            "credit": float(p[0]),
+
+            "type": "payment"
+
+        })
+
+    # ================================================================
+    # SORT BY DATE
+    # ================================================================
+
+    ledger.sort(key=lambda x: x["date"])
+
+    # ================================================================
+    # RUNNING BALANCE
+    # ================================================================
+
+    balance = 0
+
+    for row in ledger:
+
+        balance += row["debit"]
+        balance -= row["credit"]
+
+        row["balance"] = balance
 
     conn.close()
 
     return render_template(
-        'payable_history.html',
+        "payable_history.html",
         purchase=purchase,
-        payments=payments
+        ledger=ledger
     )
+
 
 
 '''SUPPLIERS'''
@@ -1555,7 +1669,297 @@ def supplier_dashboard():
         total_exposure=total_exposure
     )
 
+'''PURCHASE HISTORY'''
+@app.route('/purchase_history')
+def purchase_history():
 
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    # ================================================================
+    if session.get('role') not in ['admin', 'purchaser']:
+        return redirect('/unauthorized')
+    # ================================================================
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+
+        SELECT
+
+            pi.id,
+
+            pu.created_at,
+
+            s.name,
+
+            pr.name,
+
+            pi.quantity,
+
+            pi.buying_price,
+
+            pu.is_credit,
+
+            pr.quantity AS current_stock,
+
+            IFNULL((
+                SELECT SUM(returned_quantity)
+                FROM purchase_returns
+                WHERE purchase_item_id = pi.id
+            ),0) AS returned_qty
+
+        FROM purchase_items pi
+
+        JOIN purchases pu
+            ON pi.purchase_id = pu.id
+
+        JOIN suppliers s
+            ON pu.supplier_id = s.id
+
+        JOIN products pr
+            ON pi.product_id = pr.id
+
+        ORDER BY pu.created_at DESC
+
+    """)
+
+    rows = cursor.fetchall()
+
+    purchase_history = []
+
+    for row in rows:
+
+        purchase_item_id = row[0]
+        purchase_date = row[1]
+        supplier = row[2]
+        product = row[3]
+        purchased_qty = row[4]
+        buying_price = row[5]
+        is_credit = row[6]
+        current_stock = row[7]
+        returned_qty = row[8]
+
+        remaining_purchase = purchased_qty - returned_qty
+
+        available_return = min(
+            remaining_purchase,
+            current_stock
+        )
+
+        purchase_history.append({
+
+            "purchase_item_id": purchase_item_id,
+            "date": purchase_date,
+            "supplier": supplier,
+            "product": product,
+            "purchased_qty": purchased_qty,
+            "buying_price": buying_price,
+            "is_credit": is_credit,
+            "current_stock": current_stock,
+            "returned_qty": returned_qty,
+            "available_return": available_return
+
+        })
+
+    conn.close()
+
+    return render_template(
+        "purchase_history.html",
+        purchases=purchase_history
+    )
+
+
+'''PURCHASE RETURN'''
+@app.route('/purchase_return/<int:purchase_item_id>', methods=['GET', 'POST'])
+def purchase_return(purchase_item_id):
+
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    if session.get('role') not in ['admin', 'purchaser']:
+        return redirect('/unauthorized')
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # ==========================================================
+    # GET PURCHASE INFORMATION
+    # ==========================================================
+
+    cursor.execute("""
+        SELECT
+            pi.id,
+            s.name,
+            p.name,
+            pu.created_at,
+            pu.is_credit,
+            pi.buying_price,
+            pi.extra_cost,
+            pi.quantity,
+
+            (
+                SELECT IFNULL(SUM(returned_quantity),0)
+                FROM purchase_returns
+                WHERE purchase_item_id = pi.id
+            ) AS returned_qty,
+
+            p.quantity,
+
+            LEAST(
+                pi.quantity -
+                (
+                    SELECT IFNULL(SUM(returned_quantity),0)
+                    FROM purchase_returns
+                    WHERE purchase_item_id = pi.id
+                ),
+                p.quantity
+            ) AS available_return
+
+        FROM purchase_items pi
+
+        JOIN purchases pu
+            ON pi.purchase_id = pu.id
+
+        JOIN suppliers s
+            ON pu.supplier_id = s.id
+
+        JOIN products p
+            ON pi.product_id = p.id
+
+        WHERE pi.id=%s
+    """, (purchase_item_id,))
+
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        return "Purchase not found."
+
+    purchase = {
+        "purchase_item_id": row[0],
+        "supplier": row[1],
+        "product": row[2],
+        "date": row[3],
+        "is_credit": row[4],
+        "buying_price": float(row[5]),
+        "extra_cost": float(row[6]),
+        "purchased_qty": row[7],
+        "returned_qty": row[8],
+        "current_stock": row[9],
+        "available_return": row[10]
+    }
+
+    # ==========================================================
+    # SHOW PAGE
+    # ==========================================================
+
+    if request.method == "GET":
+
+        conn.close()
+
+        return render_template(
+            "purchase_return.html",
+            purchase=purchase
+        )
+
+    # ==========================================================
+    # RETURN PRODUCT
+    # ==========================================================
+
+    returned_qty = int(request.form["returned_quantity"])
+
+    return_type = request.form["return_type"]
+
+    reason = request.form["reason"]
+
+    if returned_qty <= 0:
+
+        conn.close()
+
+        return "Invalid quantity."
+
+    if returned_qty > purchase["available_return"]:
+
+        conn.close()
+
+        return "Return quantity exceeds available quantity."
+
+    refund_amount = purchase["buying_price"] * returned_qty
+
+    try:
+
+        # Purchase info again
+        cursor.execute("""
+            SELECT purchase_id, product_id
+            FROM purchase_items
+            WHERE id=%s
+        """, (purchase_item_id,))
+
+        purchase_info = cursor.fetchone()
+
+        purchase_id = purchase_info[0]
+        product_id = purchase_info[1]
+
+        # Record return
+        cursor.execute("""
+            INSERT INTO purchase_returns
+            (
+                purchase_item_id,
+                returned_quantity,
+                buying_price,
+                extra_cost,
+                refund_amount,
+                return_type,
+                reason
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            purchase_item_id,
+            returned_qty,
+            purchase["buying_price"],
+            0,
+            refund_amount,
+            return_type,
+            reason
+        ))
+
+        # Reduce stock
+        cursor.execute("""
+            UPDATE products
+            SET quantity = quantity - %s
+            WHERE id=%s
+        """, (
+            returned_qty,
+            product_id
+        ))
+
+        # Reduce payable if credit
+        if purchase["is_credit"]:
+
+            cursor.execute("""
+                UPDATE payables
+                SET amount_due = amount_due - %s
+                WHERE purchase_id=%s
+            """, (
+                refund_amount,
+                purchase_id
+            ))
+
+        conn.commit()
+
+    except Exception as e:
+
+        conn.rollback()
+
+        return str(e)
+
+    finally:
+
+        conn.close()
+
+    return redirect("/purchase_history")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

@@ -156,71 +156,83 @@
 
                 <tbody>
 
-                    <!-- 🔵 INITIAL PURCHASE -->
-                    {% set balance = purchase[4] %}
+{% for row in ledger %}
 
-                    <tr>
+<tr>
 
-                        <td>{{ purchase[5] }}</td>
+    <td>{{ row.date }}</td>
 
-                        <td>
-                            Initial Purchase
-                        </td>
+    <td>
 
-                        <td class="text-danger fw-bold">
-                            {{ purchase[4] }}
-                        </td>
+        {% if row.type == "purchase" %}
 
-                        <td>-</td>
+            <span class="badge bg-danger">Purchase</span>
 
-                        <td class="fw-bold">
-                            {{ balance }}
-                        </td>
+        {% elif row.type == "return" %}
 
-                    </tr>
+            <span class="badge bg-warning text-dark">Return</span>
 
-                    <!-- 🔴 PAYMENTS -->
-                    {% for p in payments %}
+        {% else %}
 
-                        {% set balance = balance - p[0] %}
+            <span class="badge bg-success">Payment</span>
 
-                        <tr>
+        {% endif %}
 
-                            <td>{{ p[2] }}</td>
+        <br>
 
-                            <td>
+        {{ row.description }}
 
-                                {% if p[1] %}
-                                    {{ p[1] }}
-                                {% else %}
-                                    Payment
-                                {% endif %}
+    </td>
 
-                            </td>
+    <td>
 
-                            <td>-</td>
+        {% if row.debit > 0 %}
+            <span class="text-danger fw-bold">
+                {{ row.debit }}
+            </span>
+        {% else %}
+            -
+        {% endif %}
 
-                            <td class="text-success fw-bold">
-                                {{ p[0] }}
-                            </td>
+    </td>
 
-                            <td class="fw-bold">
+    <td>
 
-                                {% if balance <= 0 %}
-                                    <span class="text-success">
-                                        0
-                                    </span>
-                                {% else %}
-                                    <span class="text-danger">
-                                        {{ balance }}
-                                    </span>
-                                {% endif %}
+        {% if row.credit > 0 %}
+            <span class="text-success fw-bold">
+                {{ row.credit }}
+            </span>
+        {% else %}
+            -
+        {% endif %}
 
-                            </td>
+    </td>
 
-                        </tr>
+    <td>
 
-                    {% endfor %}
+        {% if row.balance > 0 %}
+
+            <span class="text-danger fw-bold">
+                {{ row.balance }}
+            </span>
+
+        {% else %}
+
+            <span class="text-success fw-bold">
+                0
+            </span>
+
+        {% endif %}
+
+    </td>
+
+</tr>
+
+{% endfor %}
+
+
+                    
+                    
 
                 </tbody>
 
@@ -233,87 +245,110 @@
     <!-- MOBILE VIEW -->
     <div class="mobile-view">
 
-        {% set balance = purchase[4] %}
+{% for row in ledger %}
 
-        <!-- INITIAL -->
-        <div class="ledger-card shadow-sm">
+<div class="ledger-card shadow-sm">
 
-            <h5>Initial Purchase</h5>
+    <h5>
 
-            <p>
-                <strong>Date:</strong>
-                {{ purchase[5] }}
-            </p>
+        {% if row.type == "purchase" %}
 
-            <p>
-                <strong>Debt:</strong>
+            <span class="badge bg-danger">
+                Purchase
+            </span>
 
-                <span class="text-danger fw-bold">
-                    {{ purchase[4] }}
-                </span>
+        {% elif row.type == "return" %}
 
-            </p>
+            <span class="badge bg-warning text-dark">
+                Return
+            </span>
 
-            <p>
-                <strong>Balance:</strong>
+        {% else %}
 
-                <span class="text-danger fw-bold">
-                    {{ balance }}
-                </span>
+            <span class="badge bg-success">
+                Payment
+            </span>
 
-            </p>
+        {% endif %}
 
-        </div>
+    </h5>
 
-        <!-- PAYMENTS -->
-        {% for p in payments %}
+    <p>
 
-            {% set balance = balance - p[0] %}
+        <strong>Date:</strong>
 
-            <div class="ledger-card shadow-sm">
+        {{ row.date }}
 
-                <h5>
+    </p>
 
-                    {% if p[1] %}
-                        {{ p[1] }}
-                    {% else %}
-                        Payment
-                    {% endif %}
+    <p>
 
-                </h5>
+        <strong>Description:</strong>
 
-                <p>
-                    <strong>Date:</strong>
-                    {{ p[2] }}
-                </p>
+        {{ row.description }}
 
-                <p>
-                    <strong>Payment:</strong>
+    </p>
 
-                    <span class="text-success fw-bold">
-                        {{ p[0] }}
-                    </span>
+    {% if row.debit > 0 %}
 
-                </p>
+        <p>
 
-                <p>
-                    <strong>Remaining Balance:</strong>
+            <strong>Debt:</strong>
 
-                    {% if balance <= 0 %}
-                        <span class="text-success fw-bold">
-                            0
-                        </span>
-                    {% else %}
-                        <span class="text-danger fw-bold">
-                            {{ balance }}
-                        </span>
-                    {% endif %}
+            <span class="text-danger fw-bold">
 
-                </p>
+                {{ row.debit }}
 
-            </div>
+            </span>
 
-        {% endfor %}
+        </p>
+
+    {% endif %}
+
+    {% if row.credit > 0 %}
+
+        <p>
+
+            <strong>Credit:</strong>
+
+            <span class="text-success fw-bold">
+
+                {{ row.credit }}
+
+            </span>
+
+        </p>
+
+    {% endif %}
+
+    <p>
+
+        <strong>Remaining Balance:</strong>
+
+        {% if row.balance > 0 %}
+
+            <span class="text-danger fw-bold">
+
+                {{ row.balance }}
+
+            </span>
+
+        {% else %}
+
+            <span class="text-success fw-bold">
+
+                0
+
+            </span>
+
+        {% endif %}
+
+    </p>
+
+</div>
+
+{% endfor %}
+
 
     </div>
 
