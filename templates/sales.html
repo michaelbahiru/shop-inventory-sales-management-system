@@ -134,130 +134,237 @@
 <a href="/portal" class="btn btn-secondary mb-3 w-100">← Back to portal</a>
 </div>
 
+
 <script>
 
-let cart = {};
+let cart = JSON.parse(
+    localStorage.getItem("sales_cart")
+) || {};
+
+
+function saveCart() {
+    localStorage.setItem(
+        "sales_cart",
+        JSON.stringify(cart)
+    );
+}
+
 
 function addToCart(id, name, base_price, stock) {
 
-    let extra = parseFloat(document.getElementById("extra_" + id).value) || 0;
+    let extra = parseFloat(
+        document.getElementById("extra_" + id).value
+    ) || 0;
+
     let final_price = base_price + extra;
 
     if (!cart[id]) {
+
         cart[id] = {
             name: name,
             price: final_price,
             qty: 1,
             stock: stock
         };
+
     } else {
+
         if (cart[id].qty >= stock) {
             alert("Stock limit reached!");
             return;
         }
+
         cart[id].qty++;
     }
 
+    saveCart();
     renderCart();
 }
 
+
 function renderCart() {
+
     let tbody = document.querySelector("#cart-table tbody");
+
     tbody.innerHTML = "";
+
     let total = 0;
 
     for (let id in cart) {
+
         let item = cart[id];
+
         let rowTotal = item.qty * item.price;
+
         total += rowTotal;
 
         tbody.innerHTML += `
         <tr>
             <td>${item.name}</td>
+
             <td>
-                <button class="btn btn-sm btn-secondary" onclick="changeQty(${id}, -1)">-</button>
+                <button
+                    class="btn btn-sm btn-secondary"
+                    onclick="changeQty(${id}, -1)"
+                >
+                    -
+                </button>
+
                 ${item.qty}
-                <button class="btn btn-sm btn-secondary" onclick="changeQty(${id}, 1)">+</button>
+
+                <button
+                    class="btn btn-sm btn-secondary"
+                    onclick="changeQty(${id}, 1)"
+                >
+                    +
+                </button>
             </td>
+
             <td>${item.price}</td>
-            <td>${rowTotal}</td>
+
+            <td>${rowTotal.toFixed(2)}</td>
+
             <td>
-                <button class="btn btn-sm btn-danger" onclick="removeItem(${id})">X</button>
+                <button
+                    class="btn btn-sm btn-danger"
+                    onclick="removeItem(${id})"
+                >
+                    X
+                </button>
             </td>
-        </tr>`;
+
+        </tr>
+        `;
     }
 
-    document.getElementById("grand-total").innerText = total;
+    document.getElementById("grand-total").innerText =
+        total.toFixed(2);
 }
 
+
 function changeQty(id, change) {
+
     let item = cart[id];
 
+    if (!item) return;
+
     if (change > 0 && item.qty >= item.stock) {
+
         alert("No more stock!");
+
         return;
     }
 
     item.qty += change;
 
-    if (item.qty <= 0) delete cart[id];
+    if (item.qty <= 0) {
+        delete cart[id];
+    }
 
+    saveCart();
     renderCart();
 }
+
 
 function removeItem(id) {
+
     delete cart[id];
+
+    saveCart();
     renderCart();
 }
+
 
 function completeSale() {
 
     let cartArray = [];
+
     let total = 0;
 
     for (let id in cart) {
+
         let item = cart[id];
+
         cartArray.push({
             id: id,
             name: item.name,
             qty: item.qty,
             price: item.price
         });
+
         total += item.qty * item.price;
     }
 
-    let customer_id = document.getElementById("customer_id").value;
-    let is_credit = document.getElementById("is_credit").checked;
+    let customer_id =
+        document.getElementById("customer_id").value;
+
+    let is_credit =
+        document.getElementById("is_credit").checked;
 
     if (cartArray.length === 0) {
+
         alert("Cart is empty!");
+
         return;
     }
 
     fetch('/complete_sale', {
+
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+
+        headers: {
+            'Content-Type': 'application/json'
+        },
+
         body: JSON.stringify({
+
             cart: cartArray,
             total: total,
             customer_id: customer_id,
             is_credit: is_credit
+
         })
+
     })
+
     .then(res => res.json())
+
     .then(data => {
 
         if (data.status === "error") {
+
             alert(data.message);
+
             return;
         }
 
-        window.location.href = "/receipt/" + data.sale_id;
+        // Clear browser cart after successful sale
+        localStorage.removeItem("sales_cart");
+
+        // Reset memory cart
+        cart = {};
+
+        window.location.href =
+            "/receipt/" + data.sale_id;
+
+    })
+
+    .catch(error => {
+
+        console.error(error);
+
+        alert("Error completing sale.");
 
     });
 }
 
+
+// Load saved cart automatically
+renderCart();
+
 </script>
+
 
 </body>
 </html>
+
