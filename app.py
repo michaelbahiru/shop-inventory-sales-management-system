@@ -987,9 +987,9 @@ def payment_history(receivable_id):
 
     payments = cursor.fetchall()
 
-    # ============================================
+    # ============================================___
     # SALES RETURNS
-    # ============================================
+    # ============================================___
     cursor.execute("""
         SELECT
             sr.returned_amount,
