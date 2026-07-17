@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Customer Payment Ledger</title>
+    <title>Customer Ledger</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -86,6 +86,56 @@
         </div>
     </div>
 
+
+    <!-- CUSTOMER INFO -->
+<div class="card mb-3 shadow-sm">
+
+    <div class="card-body">
+
+        <div class="row">
+
+            <div class="col-md-6">
+
+                <p>
+                    <strong>Customer:</strong>
+                    {{ receivable[0] }}
+                </p>
+
+                <p>
+                    <strong>Sale Date:</strong>
+                    {{ receivable[3] }}
+                </p>
+
+            </div>
+
+            <div class="col-md-6">
+
+                <p>
+                    <strong>Original Debt:</strong>
+
+                    <span class="text-danger fw-bold">
+                        {{ receivable[2] }}
+                    </span>
+
+                </p>
+
+                <p>
+                    <strong>Current Balance:</strong>
+
+                    <span class="text-danger fw-bold">
+                        {{ receivable[4] }}
+                    </span>
+
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
     <!-- ========================= -->
     <!-- DESKTOP TABLE -->
     <!-- ========================= -->
@@ -95,53 +145,101 @@
 
             <table class="table table-bordered align-middle">
 
+               
                 <thead class="table-dark">
-
                     <tr>
                         <th>Date</th>
                         <th>Description</th>
-                        <th>Debit (Customer Owes)</th>
-                        <th>Credit (Customer Paid)</th>
-                        <th>Reference</th>
+                        <th>Debit (Debt)</th>
+                        <th>Credit (Payment)</th> 
+                        <th>Balance</th>
                     </tr>
-
                 </thead>
 
+                
                 <tbody>
 
-                    {% for p in payments %}
+{% for row in ledger %}
 
-                    <tr>
+<tr>
 
-                        <td>
-                            {{ p[2] }}
-                        </td>
+    <td>{{ row.date }}</td>
 
-                        <td>
-                            Customer Payment
-                        </td>
+    <td>
 
-                        <td>
-                            -
-                        </td>
+        {% if row.type == "sale" %}
 
-                        <td class="amount-negative">
-                            {{ p[0] }}
-                        </td>
+            <span class="badge bg-danger">
+                Sale
+            </span>
 
-                        <td>
-                            {% if p[1] %}
-                                {{ p[1] }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
+        {% else %}
 
-                    </tr>
+            <span class="badge bg-success">
+                Payment
+            </span>
 
-                    {% endfor %}
+        {% endif %}
 
-                </tbody>
+        <br>
+
+        {{ row.description }}
+
+    </td>
+
+    <td>
+
+        {% if row.debit > 0 %}
+
+            <span class="text-danger fw-bold">
+                {{ row.debit }}
+            </span>
+
+        {% else %}
+            -
+        {% endif %}
+
+    </td>
+
+    <td>
+
+        {% if row.credit > 0 %}
+
+            <span class="text-success fw-bold">
+                {{ row.credit }}
+            </span>
+
+        {% else %}
+            -
+        {% endif %}
+
+    </td>
+
+    <td>
+
+        {% if row.balance > 0 %}
+
+            <span class="text-danger fw-bold">
+                {{ row.balance }}
+            </span>
+
+        {% else %}
+
+            <span class="text-success fw-bold">
+                0
+            </span>
+
+        {% endif %}
+
+    </td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+
 
             </table>
 
@@ -154,46 +252,107 @@
 
     <div class="mobile-view">
 
-        {% for p in payments %}
+{% for row in ledger %}
 
-        <div class="mobile-card">
+<div class="mobile-card">
 
-            <h6 class="mb-3">
-                Payment Record
-            </h6>
+    <h5>
 
-            <p class="mb-1">
-                <strong>Date:</strong>
-                {{ p[2] }}
-            </p>
+        {% if row.type == "sale" %}
 
-            <p class="mb-1">
-                <strong>Description:</strong>
-                Customer Payment
-            </p>
+            <span class="badge bg-danger">
+                Sale
+            </span>
 
-            <p class="mb-1">
-                <strong>Amount Paid:</strong>
-                <span class="amount-negative">
-                    {{ p[0] }}
-                </span>
-            </p>
+        {% else %}
 
-            <p class="mb-0">
-                <strong>Reference:</strong>
+            <span class="badge bg-success">
+                Payment
+            </span>
 
-                {% if p[1] %}
-                    {{ p[1] }}
-                {% else %}
-                    -
-                {% endif %}
-            </p>
+        {% endif %}
 
-        </div>
+    </h5>
 
-        {% endfor %}
+    <p>
 
-    </div>
+        <strong>Date:</strong>
+
+        {{ row.date }}
+
+    </p>
+
+    <p>
+
+        <strong>Description:</strong>
+
+        {{ row.description }}
+
+    </p>
+
+    {% if row.debit > 0 %}
+
+    <p>
+
+        <strong>Debt:</strong>
+
+        <span class="text-danger fw-bold">
+
+            {{ row.debit }}
+
+        </span>
+
+    </p>
+
+    {% endif %}
+
+    {% if row.credit > 0 %}
+
+    <p>
+
+        <strong>Payment:</strong>
+
+        <span class="text-success fw-bold">
+
+            {{ row.credit }}
+
+        </span>
+
+    </p>
+
+    {% endif %}
+
+    <p>
+
+        <strong>Remaining Balance:</strong>
+
+        {% if row.balance > 0 %}
+
+            <span class="text-danger fw-bold">
+
+                {{ row.balance }}
+
+            </span>
+
+        {% else %}
+
+            <span class="text-success fw-bold">
+
+                0
+
+            </span>
+
+        {% endif %}
+
+    </p>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+
 
 </div>
 
@@ -202,35 +361,3 @@
 
 
 
-
-<!--
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Payment History</title>
-</head>
-<body>
-
-<h2>Payment History</h2>
-
-<table border="1">
-    <tr>
-        <th>Amount</th>
-        <th>Reference</th>
-        <th>Date</th>
-    </tr>
-
-    {% for p in payments %}
-    <tr>
-        <td>{{ p[0] }}</td>
-        <td>{{ p[1] }}</td>
-        <td>{{ p[2] }}</td>
-    </tr>
-    {% endfor %}
-</table>
-
-<a href="/receivables">Back</a>
-
-</body>
-</html>
--->

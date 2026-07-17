@@ -613,15 +613,22 @@ def complete_sale():
                     "message": "Customer must be selected for credit sales."
                 }
 
+            
             cursor.execute("""
-                INSERT INTO receivables
-                (customer_id, sale_id, amount_due)
-                VALUES (%s, %s, %s)
-            """, (
-                customer_id,
-                sale_id,
-                total_amount
-            ))
+                           INSERT INTO receivables
+                           (
+                           customer_id,
+                           sale_id,
+                           original_amount,
+                           amount_due
+                           )
+                           VALUES (%s, %s, %s, %s)
+                           """, (
+                               customer_id,
+                               sale_id,
+                               total_amount,   # Original amount
+                               total_amount    # Current amount due
+                               ))
 
         # =========================================
         # STEP 4: INSERT SALE ITEMS
@@ -740,29 +747,181 @@ def add_customer():
 '''RECEIVABLES PAGE'''
 @app.route('/receivables')
 def receivables():
+
     if 'user_id' not in session:
         return redirect('/login')
-    #-------------------------------------------------------------
+
     if session.get('role') not in ['admin', 'Sales']:
         return redirect('/unauthorized')
-    #------------------------------------------------------------
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # ===============================
+    # GET CUSTOMERS FOR FILTER
+    # ===============================
     cursor.execute("""
-        SELECT r.id, c.id, c.name, r.amount_due, s.created_at
-        FROM receivables r
-        LEFT JOIN customers c ON r.customer_id = c.id
-        LEFT JOIN sales s ON r.sale_id = s.id
-        WHERE r.amount_due > 0
+        SELECT id, name
+        FROM customers
+        ORDER BY name
     """)
+    customers = cursor.fetchall()
+
+    # Selected customer
+    selected_customer = request.args.get("customer_id", "all")
+    hide_paid = request.args.get("hide_paid") == "1"
+
+    # ===============================
+    # RECEIVABLES QUERY
+    # ===============================
+    query = """
+        SELECT
+            r.id,
+            c.id,
+            c.name,
+            r.amount_due,
+            s.created_at
+
+        FROM receivables r
+
+        LEFT JOIN customers c
+            ON r.customer_id = c.id
+
+        LEFT JOIN sales s
+            ON r.sale_id = s.id
+
+        WHERE 1=1
+    """
+
+    params = []
+
+    # Customer filter
+    if selected_customer != "all":
+        query += " AND r.customer_id = %s"
+        params.append(selected_customer)
+
+    # Hide fully paid
+    if hide_paid:
+        query += " AND r.amount_due > 0"
+
+    query += " ORDER BY s.created_at DESC"
+
+    cursor.execute(query, params)
 
     receivables = cursor.fetchall()
 
     conn.close()
 
-    return render_template('receivables.html', receivables=receivables)
+    return render_template(
+        "receivables.html",
+        receivables=receivables,
+        customers=customers,
+        selected_customer=selected_customer,
+        hide_paid=hide_paid
+    )
+
+
+
+
+
+
+'''CUSTOMER PAYMENT HISTORY'''
+@app.route('/payment_history/<int:receivable_id>')
+def payment_history(receivable_id):
+
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    #-------------------------------------------------------------
+    if session.get('role') not in ['admin', 'Sales']:
+        return redirect('/unauthorized')
+    #-------------------------------------------------------------
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # ============================================
+    # ORIGINAL CREDIT SALE INFORMATION
+    # ============================================
+    cursor.execute("""
+        SELECT
+            c.name,
+            s.created_at,
+            r.original_amount,
+            r.amount_due
+        FROM receivables r
+
+        LEFT JOIN customers c
+            ON r.customer_id = c.id
+
+        LEFT JOIN sales s
+            ON r.sale_id = s.id
+
+        WHERE r.id=%s
+    """, (receivable_id,))
+
+    sale = cursor.fetchone()
+
+    # ============================================
+    # PAYMENT HISTORY
+    # ============================================
+    cursor.execute("""
+        SELECT
+            amount_paid,
+            payment_link,
+            created_at
+        FROM receivable_payments
+
+        WHERE receivable_id=%s
+
+        ORDER BY created_at ASC
+    """, (receivable_id,))
+
+    payments = cursor.fetchall()
+
+    # ============================================
+    # BUILD LEDGER
+    # ============================================
+
+    ledger = []
+
+    balance = sale[2]      # original_amount
+
+    # Initial Credit Sale
+    ledger.append({
+        "date": sale[1],
+        "type": "sale",
+        "description": "Credit Sale",
+        "debit": sale[2],
+        "credit": 0,
+        "balance": balance
+    })
+
+    # Customer Payments
+    for payment in payments:
+
+        balance -= payment[0]
+
+        ledger.append({
+            "date": payment[2],
+            "type": "payment",
+            "description": payment[1] if payment[1] else "Customer Payment",
+            "debit": 0,
+            "credit": payment[0],
+            "balance": max(balance, 0)
+        })
+
+    conn.close()
+
+    return render_template(
+        "payment_history.html",
+        receivable=sale,
+        ledger=ledger
+    )
+
+
+
+
 
 
 '''PAYMENT RECEIVABLE ROUTE'''
@@ -770,10 +929,6 @@ def receivables():
 def pay_receivable(id):
     if 'user_id' not in session:
         return redirect('/login')
-    #-------------------------------------------------------------
-    if session.get('role') not in ['admin', 'Sales']:
-        return redirect('/unauthorized')
-    #------------------------------------------------------------
 
     amount = float(request.form['amount'])
     
@@ -809,6 +964,9 @@ def pay_receivable(id):
     return redirect('/receivables')
 
 
+
+
+
 '''CUSTOMER BALANCE VIEW'''
 @app.route('/customer_balance/<int:customer_id>')
 def customer_balance(customer_id):
@@ -839,34 +997,6 @@ def customer_balance(customer_id):
     return render_template('customer_balance.html',
                            customer=customer,
                            total_due=total_due)
-
-'''PAYMENT HISTORY'''
-@app.route('/payment_history/<int:receivable_id>')
-def payment_history(receivable_id):
-    if 'user_id' not in session:
-        return redirect('/login')
-    #-------------------------------------------------------------
-    if session.get('role') not in ['admin', 'Sales']:
-        return redirect('/unauthorized')
-    #------------------------------------------------------------
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT amount_paid, payment_link, created_at
-        FROM receivable_payments
-        WHERE receivable_id=%s
-    """, (receivable_id,))
-
-    payments = cursor.fetchall()
-
-    conn.close()
-
-    return render_template('payment_history.html', payments=payments)
-
-
-
 
 
 
@@ -1054,6 +1184,7 @@ def reports():
 
 
 '''PAYABLES PAGE'''
+'''PAYABLES PAGE'''
 @app.route('/payables')
 def payables():
 
@@ -1066,22 +1197,33 @@ def payables():
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # ===============================
+    # GET ALL SUPPLIERS FOR FILTER
+    # ===============================
     cursor.execute("""
+        SELECT id, name
+        FROM suppliers
+        ORDER BY name
+    """)
+    suppliers = cursor.fetchall()
+
+    # Selected supplier
+    selected_supplier = request.args.get("supplier_id", "all")
+
+    hide_paid = request.args.get("hide_paid")
+
+    # ===============================
+    # PAYABLES QUERY
+    # ===============================
+    query = """
         SELECT
             p.id,
-
             s.name AS supplier_name,
-
             pr.name AS product_name,
-
             pi.quantity,
-
             (pi.buying_price + pi.extra_cost) AS unit_cost,
-
             p.amount_due,
-
             pu.created_at,
-
             pi.description
 
         FROM payables p
@@ -1099,19 +1241,34 @@ def payables():
             ON pi.product_id = pr.id
 
         WHERE p.purchase_id IS NOT NULL
+    """
 
-        ORDER BY pu.created_at DESC
-    """)
+    params = []
 
+    # Filter by supplier
+    if selected_supplier != "all":
+        query += " AND p.supplier_id = %s"
+        params.append(selected_supplier)
+    
+    # Hide fully paid payables
+    if hide_paid:
+        query += " AND p.amount_due > 0"
+    
+    query += " ORDER BY pu.created_at DESC"
+    
+
+    cursor.execute(query, params)
     payables = cursor.fetchall()
 
     conn.close()
 
     return render_template(
-        "payables.html",
-        payables=payables
+    "payables.html",
+    payables=payables,
+    suppliers=suppliers,
+    selected_supplier=selected_supplier,
+    hide_paid=hide_paid
     )
-
 
 
 '''PAYMENT(PAYABLES) ROUTE'''
