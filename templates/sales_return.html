@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Sales Return</title>
+
+    <link rel="icon"
+          href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-4">
+
+    <!-- BACK -->
+    <a href="/sales_history"
+       class="btn btn-secondary mb-3">
+
+        ← Back
+
+    </a>
+
+    <h3 class="mb-4">
+
+        Sales Return
+
+    </h3>
+
+    <div class="card shadow">
+
+        <div class="card-body">
+
+            <div class="row">
+
+                <!-- LEFT -->
+                <div class="col-md-6">
+
+                    <p>
+                        <strong>Customer:</strong>
+                        {{ sale.customer }}
+                    </p>
+
+                    <p>
+                        <strong>Product:</strong>
+                        {{ sale.product }}
+                    </p>
+
+                    <p>
+                        <strong>Sale Date:</strong>
+                        {{ sale.date }}
+                    </p>
+
+                    <p>
+
+                        <strong>Sale Type:</strong>
+
+                        {% if sale.is_credit %}
+
+                            <span class="badge bg-danger">
+
+                                Credit
+
+                            </span>
+
+                        {% else %}
+
+                            <span class="badge bg-success">
+
+                                Cash
+
+                            </span>
+
+                        {% endif %}
+
+                    </p>
+
+                </div>
+
+                <!-- RIGHT -->
+                <div class="col-md-6">
+
+                    <p>
+
+                        <strong>Selling Price:</strong>
+
+                        <span id="sellingPrice">
+
+                            {{ sale.selling_price }}
+
+                        </span>
+
+                        Birr
+
+                    </p>
+
+                    <p>
+
+                        <strong>Sold Quantity:</strong>
+
+                        {{ sale.sold_qty }}
+
+                    </p>
+
+                    <p>
+
+                        <strong>Already Returned:</strong>
+
+                        {{ sale.returned_qty }}
+
+                    </p>
+
+                    <p>
+
+                        <strong>Current Stock:</strong>
+
+                        {{ sale.current_stock }}
+
+                    </p>
+
+                    <p>
+
+                        <strong>Available Return:</strong>
+
+                        <span class="badge bg-primary">
+
+                            {{ sale.available_return }}
+
+                        </span>
+
+                    </p>
+
+                </div>
+
+            </div>
+
+            <hr>
+
+            <form method="POST">
+
+                <!-- RETURN QUANTITY -->
+                <div class="mb-3">
+
+                    <label class="form-label">
+
+                        Return Quantity
+
+                    </label>
+
+                    <input
+                        type="number"
+                        min="1"
+                        max="{{ sale.available_return }}"
+                        name="returned_quantity"
+                        id="returned_quantity"
+                        class="form-control"
+                        required>
+
+                </div>
+
+                <!-- RETURN TYPE -->
+                <div class="mb-3">
+
+                    <label class="form-label">
+
+                        Return Type
+
+                    </label>
+
+                    <select
+                        name="return_type"
+                        class="form-select">
+
+                        <option>Customer Changed Mind</option>
+
+                        <option>Wrong Item</option>
+
+                        <option>Damaged Product</option>
+
+                        <option>Expired Product</option>
+
+                        <option>Warranty Claim</option>
+
+                        <option>Other</option>
+
+                    </select>
+
+                </div>
+
+                <!-- REASON -->
+                <div class="mb-3">
+
+                    <label class="form-label">
+
+                        Reason
+
+                    </label>
+
+                    <textarea
+                        name="reason"
+                        rows="3"
+                        class="form-control"></textarea>
+
+                </div>
+
+                <!-- REFUND -->
+                <div class="alert alert-warning">
+
+                    Refund Amount
+
+                    <h4>
+
+                        <span id="refund">
+
+                            0.00
+
+                        </span>
+
+                        Birr
+
+                    </h4>
+
+                </div>
+
+                <button
+                    class="btn btn-danger w-100">
+
+                    Process Return
+
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+const qty = document.getElementById("returned_quantity");
+
+const refund = document.getElementById("refund");
+
+const sellingPrice = parseFloat(
+    document.getElementById("sellingPrice").innerText
+);
+
+qty.addEventListener("input", function(){
+
+    let q = parseFloat(this.value) || 0;
+
+    refund.innerText = (q * sellingPrice).toFixed(2);
+
+});
+
+</script>
+
+</body>
+</html>

@@ -158,82 +158,105 @@
 
                 
                 <tbody>
+                    {% for row in ledger %}
+                    <tr>
+                        <td>{{ row.date }}</td>
 
-{% for row in ledger %}
+                        
+                        <td>
 
-<tr>
+    {% if row.type == "sale" %}
 
-    <td>{{ row.date }}</td>
+        <span class="badge bg-danger">
+            Credit Sale
+        </span>
 
-    <td>
+    {% elif row.type == "return" %}
 
-        {% if row.type == "sale" %}
+        <span class="badge bg-warning text-dark">
+            Sales Return
+        </span>
 
-            <span class="badge bg-danger">
-                Sale
-            </span>
+    {% else %}
 
-        {% else %}
+        <span class="badge bg-success">
+            Payment
+        </span>
 
-            <span class="badge bg-success">
-                Payment
-            </span>
+    {% endif %}
 
-        {% endif %}
+    <br>
 
-        <br>
+    {{ row.description }}
 
-        {{ row.description }}
+</td>
 
-    </td>
 
-    <td>
 
-        {% if row.debit > 0 %}
+                        
+                        <td>
+                            {% if row.debit > 0 %}
+                            <span class="text-danger fw-bold">
+                                {{ row.debit }}
+                            </span>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        
+                        <td>
 
-            <span class="text-danger fw-bold">
-                {{ row.debit }}
-            </span>
+       
+                            {% if row.credit > 0 %}
 
-        {% else %}
-            -
-        {% endif %}
+         
+                            <span class="text-success fw-bold">
+          
+                                {{ row.credit }}
+          
+                            </span>
 
-    </td>
+     
+                            {% else %}
+      
+                            -
+      
+                            {% endif %}
 
-    <td>
+  
+                        </td>
 
-        {% if row.credit > 0 %}
+  
+                        <td>
 
-            <span class="text-success fw-bold">
-                {{ row.credit }}
-            </span>
+  
+                            {% if row.balance > 0 %}
 
-        {% else %}
-            -
-        {% endif %}
+  
+                            <span class="text-danger fw-bold">
+  
+                                {{ row.balance }}
+  
+                            </span>
 
-    </td>
+  
+                            {% else %}
 
-    <td>
+  
+                            <span class="text-success fw-bold">
+  
+                                0
+  
+                            </span>
 
-        {% if row.balance > 0 %}
+  
+                            {% endif %}
 
-            <span class="text-danger fw-bold">
-                {{ row.balance }}
-            </span>
+  
+                        </td>
 
-        {% else %}
 
-            <span class="text-success fw-bold">
-                0
-            </span>
-
-        {% endif %}
-
-    </td>
-
-</tr>
+                    </tr>
 
 {% endfor %}
 
@@ -256,23 +279,30 @@
 
 <div class="mobile-card">
 
+    
     <h5>
 
-        {% if row.type == "sale" %}
+    {% if row.type == "sale" %}
 
-            <span class="badge bg-danger">
-                Sale
-            </span>
+        <span class="badge bg-danger">
+            Credit Sale
+        </span>
 
-        {% else %}
+    {% elif row.type == "return" %}
 
-            <span class="badge bg-success">
-                Payment
-            </span>
+        <span class="badge bg-warning text-dark">
+            Sales Return
+        </span>
 
-        {% endif %}
+    {% else %}
 
-    </h5>
+        <span class="badge bg-success">
+            Payment
+        </span>
+
+    {% endif %}
+
+</h5>
 
     <p>
 

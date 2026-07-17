@@ -708,6 +708,109 @@ def complete_sale():
     finally:
         conn.close()
 
+
+
+
+
+
+
+'''SALES HISTORY'''
+@app.route('/sales_history')
+def sales_history():
+
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    # ============================================================
+    if session.get('role') not in ['admin', 'Sales']:
+        return redirect('/unauthorized')
+    # ============================================================
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+
+            si.id,
+
+            c.name,
+
+            p.name,
+
+            si.quantity,
+
+            si.unit_price,
+
+            s.total_amount,
+
+            s.created_at,
+
+            p.quantity,
+
+            s.is_credit,
+
+            COALESCE(
+                (
+                    SELECT SUM(sr.returned_quantity)
+                    FROM sales_returns sr
+                    WHERE sr.sale_item_id = si.id
+                ),
+                0
+            ) AS returned_qty,
+
+            (
+                si.quantity -
+                COALESCE(
+                    (
+                        SELECT SUM(sr.returned_quantity)
+                        FROM sales_returns sr
+                        WHERE sr.sale_item_id = si.id
+                    ),
+                    0
+                )
+            ) AS available_return
+
+        FROM sale_items si
+
+        LEFT JOIN sales s
+            ON si.sale_id = s.id
+
+        LEFT JOIN customers c
+            ON s.customer_id = c.id
+
+        LEFT JOIN products p
+            ON si.product_id = p.id
+
+        ORDER BY s.created_at DESC
+
+    """)
+
+    sales = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        "sales_history.html",
+        sales=sales
+    )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 '''ADD CUSTOMERS PAGE ROUTE'''
 @app.route('/customers')
 def customers():
@@ -825,6 +928,9 @@ def receivables():
 
 
 
+
+
+
 '''CUSTOMER PAYMENT HISTORY'''
 @app.route('/payment_history/<int:receivable_id>')
 def payment_history(receivable_id):
@@ -832,10 +938,8 @@ def payment_history(receivable_id):
     if 'user_id' not in session:
         return redirect('/login')
 
-    #-------------------------------------------------------------
     if session.get('role') not in ['admin', 'Sales']:
         return redirect('/unauthorized')
-    #-------------------------------------------------------------
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -857,13 +961,17 @@ def payment_history(receivable_id):
         LEFT JOIN sales s
             ON r.sale_id = s.id
 
-        WHERE r.id=%s
+        WHERE r.id = %s
     """, (receivable_id,))
 
     sale = cursor.fetchone()
 
+    if not sale:
+        conn.close()
+        return "Receivable not found."
+
     # ============================================
-    # PAYMENT HISTORY
+    # CUSTOMER PAYMENTS
     # ============================================
     cursor.execute("""
         SELECT
@@ -872,7 +980,7 @@ def payment_history(receivable_id):
             created_at
         FROM receivable_payments
 
-        WHERE receivable_id=%s
+        WHERE receivable_id = %s
 
         ORDER BY created_at ASC
     """, (receivable_id,))
@@ -880,19 +988,42 @@ def payment_history(receivable_id):
     payments = cursor.fetchall()
 
     # ============================================
+    # SALES RETURNS
+    # ============================================
+    cursor.execute("""
+        SELECT
+            sr.returned_amount,
+            sr.reason,
+            sr.created_at
+        FROM sales_returns sr
+
+        JOIN sale_items si
+            ON sr.sale_item_id = si.id
+
+        JOIN receivables r
+            ON r.sale_id = si.sale_id
+
+        WHERE r.id = %s
+
+        ORDER BY sr.created_at ASC
+    """, (receivable_id,))
+
+    returns = cursor.fetchall()
+
+    # ============================================
     # BUILD LEDGER
     # ============================================
 
     ledger = []
 
-    balance = sale[2]      # original_amount
+    balance = float(sale[2])      # original_amount
 
     # Initial Credit Sale
     ledger.append({
         "date": sale[1],
         "type": "sale",
         "description": "Credit Sale",
-        "debit": sale[2],
+        "debit": float(sale[2]),
         "credit": 0,
         "balance": balance
     })
@@ -900,16 +1031,36 @@ def payment_history(receivable_id):
     # Customer Payments
     for payment in payments:
 
-        balance -= payment[0]
+        balance -= float(payment[0])
 
         ledger.append({
             "date": payment[2],
             "type": "payment",
             "description": payment[1] if payment[1] else "Customer Payment",
             "debit": 0,
-            "credit": payment[0],
+            "credit": float(payment[0]),
             "balance": max(balance, 0)
         })
+
+    # Sales Returns
+    for returned in returns:
+
+        balance -= float(returned[0])
+
+        ledger.append({
+            "date": returned[2],
+            "type": "return",
+            "description": returned[1] if returned[1] else "Sales Return",
+            "debit": 0,
+            "credit": float(returned[0]),
+            "balance": max(balance, 0)
+        })
+
+    # ============================================
+    # SORT LEDGER CHRONOLOGICALLY
+    # ============================================
+
+    ledger.sort(key=lambda x: x["date"])
 
     conn.close()
 
@@ -918,6 +1069,30 @@ def payment_history(receivable_id):
         receivable=sale,
         ledger=ledger
     )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2117,6 +2292,241 @@ def purchase_return(purchase_item_id):
         conn.close()
 
     return redirect("/purchase_history")
+
+
+
+
+
+
+
+'''SALES RETURN'''
+@app.route('/sales_return/<int:sale_item_id>', methods=['GET', 'POST'])
+def sales_return(sale_item_id):
+
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    if session.get('role') not in ['admin', 'Sales']:
+        return redirect('/unauthorized')
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # ==========================================================
+    # GET SALE INFORMATION
+    # ==========================================================
+
+    cursor.execute("""
+        SELECT
+
+            si.id,
+            si.sale_id,
+            si.product_id,
+
+            c.name,
+
+            p.name,
+
+            s.created_at,
+
+            s.is_credit,
+
+            s.customer_id,
+
+            si.unit_price,
+
+            si.quantity,
+
+            p.quantity,
+
+            COALESCE(
+                (
+                    SELECT SUM(returned_quantity)
+                    FROM sales_returns
+                    WHERE sale_item_id = si.id
+                ),
+                0
+            ) AS returned_qty,
+
+            LEAST(
+                si.quantity -
+                COALESCE(
+                    (
+                        SELECT SUM(returned_quantity)
+                        FROM sales_returns
+                        WHERE sale_item_id = si.id
+                    ),
+                    0
+                ),
+                si.quantity
+            ) AS available_return
+
+        FROM sale_items si
+
+        JOIN sales s
+            ON si.sale_id = s.id
+
+        LEFT JOIN customers c
+            ON s.customer_id = c.id
+
+        JOIN products p
+            ON si.product_id = p.id
+
+        WHERE si.id = %s
+
+    """, (sale_item_id,))
+
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        return "Sale not found."
+
+    sale = {
+
+        "sale_item_id": row[0],
+        "sale_id": row[1],
+        "product_id": row[2],
+
+        "customer": row[3] if row[3] else "Walk-in Customer",
+
+        "product": row[4],
+
+        "date": row[5],
+
+        "is_credit": row[6],
+
+        "customer_id": row[7],
+
+        "selling_price": float(row[8]),
+
+        "sold_qty": row[9],
+
+        "current_stock": row[10],
+
+        "returned_qty": row[11],
+
+        "available_return": row[12]
+
+    }
+
+    # ==========================================================
+    # SHOW PAGE
+    # ==========================================================
+
+    if request.method == "GET":
+
+        conn.close()
+
+        return render_template(
+            "sales_return.html",
+            sale=sale
+        )
+
+    # ==========================================================
+    # PROCESS RETURN
+    # ==========================================================
+
+    returned_qty = int(request.form["returned_quantity"])
+
+    return_type = request.form["return_type"]
+
+    reason = request.form["reason"]
+
+    if returned_qty <= 0:
+
+        conn.close()
+
+        return "Invalid quantity."
+
+    if returned_qty > sale["available_return"]:
+
+        conn.close()
+
+        return "Return quantity exceeds available quantity."
+
+    refund_amount = sale["selling_price"] * returned_qty
+
+    try:
+
+        # ======================================
+        # RECORD SALES RETURN
+        # ======================================
+
+        
+        cursor.execute("""
+                       INSERT INTO sales_returns
+                       (
+                       sale_item_id,
+                       returned_quantity,
+                       returned_amount,
+                       return_type,
+                       reason
+                       )
+                       VALUES (%s,%s,%s,%s,%s)
+                       """, (
+                           sale_item_id,
+                           returned_qty,
+                           refund_amount,
+                           return_type,
+                           reason
+                           ))
+
+        # ======================================
+        # RETURN PRODUCT TO STOCK
+        # ======================================
+
+        cursor.execute("""
+            UPDATE products
+            SET quantity = quantity + %s
+            WHERE id = %s
+        """, (
+
+            returned_qty,
+            sale["product_id"]
+
+        ))
+
+        # ======================================
+        # REDUCE CUSTOMER RECEIVABLE
+        # (Credit Sales Only)
+        # ======================================
+
+        if sale["is_credit"]:
+
+            cursor.execute("""
+                UPDATE receivables
+                SET amount_due = amount_due - %s
+                WHERE sale_id = %s
+            """, (
+
+                refund_amount,
+                sale["sale_id"]
+
+            ))
+
+        conn.commit()
+
+    except Exception as e:
+
+        conn.rollback()
+
+        return str(e)
+
+    finally:
+
+        conn.close()
+
+    return redirect("/sales_history")
+
+
+
+
+
+
+
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

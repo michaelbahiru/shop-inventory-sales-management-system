@@ -103,12 +103,12 @@
 <body>
 
 <div class="receipt-card">
-    <h2>Shop Receipt</h2>
+    <h2><!--Shop Receipt--></h2>
     
     <div class="header-info">
-        <p><strong>Sale ID:</strong> {{ sale[0] }}</p>
+        <p><strong><!--Sale ID:--></strong> {{ sale[0] }}</p>
         <p><strong>Customer:</strong> {{ sale[3] or "Walk-in" }}</p>
-        <p><strong>Payment:</strong> {{ "Credit" if sale[2] else "Cash" }}</p>
+        <p><strong>የተከፈለው:</strong> {{ "Credit" if sale[2] else "Cash" }}</p>
         <p><strong>Date and Time:</strong><div class="details">
             <!-- ሰዓቱ እዚህ ጋር ይቀመጣል -->
                       <div class="date-time"><span id="transaction-time"></span></div>
